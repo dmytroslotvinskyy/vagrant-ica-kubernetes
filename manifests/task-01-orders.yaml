@@ -1,0 +1,36 @@
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: orders-dr
+  namespace: orders
+spec:
+  host: orders.orders.svc.cluster.local
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: orders-vs
+  namespace: orders
+spec:
+  hosts:
+  - orders
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: orders
+        subset: v1
+      weight: 60
+    - destination:
+        host: orders
+        subset: v2
+      weight: 40

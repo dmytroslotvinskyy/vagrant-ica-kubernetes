@@ -59,6 +59,18 @@ Vagrant.configure("2") do |config|
       },
       path: "scripts/master.sh"
     controlplane.vm.provision "shell", path: "scripts/istio-ica-lab.sh"
+    controlplane.vm.provision "shell",
+      env: {
+        "SSH_USER" => "student",
+        "SSH_BANNER_MESSAGE" => "Authorized access only. Student lab node."
+      },
+      path: "scripts/ssh-setup.sh"
+    controlplane.vm.provision "shell",
+      env: {
+        "SSH_USER" => "vagrant",
+        "SSH_BANNER_MESSAGE" => "Authorized access only. Student lab node."
+      },
+      path: "scripts/ssh-setup.sh"
   end
 
   (1..NUM_WORKER_NODES).each do |i|
@@ -88,6 +100,18 @@ Vagrant.configure("2") do |config|
         },
         path: "scripts/common.sh"
       node.vm.provision "shell", path: "scripts/node.sh"
+      node.vm.provision "shell",
+        env: {
+          "SSH_USER" => "student",
+          "SSH_BANNER_MESSAGE" => "Authorized access only. Student lab node."
+        },
+        path: "scripts/ssh-setup.sh"
+      node.vm.provision "shell",
+        env: {
+          "SSH_USER" => "vagrant",
+          "SSH_BANNER_MESSAGE" => "Authorized access only. Student lab node."
+        },
+        path: "scripts/ssh-setup.sh"
 
       # Only install the dashboard after provisioning the last worker (and when enabled).
       if i == NUM_WORKER_NODES and settings["software"]["dashboard"] and settings["software"]["dashboard"] != ""
