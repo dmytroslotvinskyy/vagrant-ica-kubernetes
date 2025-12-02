@@ -37,7 +37,18 @@ install_istio_control_plane() {
   fi
 
   echo "[istio-ica-lab] Installing Istio control plane (demo profile)"
-  istioctl install --set profile=demo -y
+  local attempts=0
+  local max_attempts=3
+  local timeout="${ISTIO_INSTALL_TIMEOUT:-10m}"
+  until istioctl install --set profile=demo --wait --timeout="${timeout}" -y; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge "$max_attempts" ]; then
+      echo "[istio-ica-lab] Failed to install Istio after ${attempts} attempts"
+      return 1
+    fi
+    echo "[istio-ica-lab] Retry Istio install (${attempts}/${max_attempts}) in 30s..."
+    sleep 30
+  done
 }
 
 prepare_namespaces() {
