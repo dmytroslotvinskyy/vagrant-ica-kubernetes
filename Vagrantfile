@@ -58,7 +58,7 @@ Vagrant.configure("2") do |config|
         "SERVICE_CIDR" => settings["network"]["service_cidr"]
       },
       path: "scripts/master.sh"
-    controlplane.vm.provision "shell", path: "scripts/istio-ica-lab.sh"
+    controlplane.vm.provision "shell", run: "always", path: "scripts/istio-ica-lab.sh"
     controlplane.vm.provision "shell",
       env: {
         "SSH_USER" => "student",
