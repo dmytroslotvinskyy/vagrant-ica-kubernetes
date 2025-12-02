@@ -60,6 +60,8 @@ Refer to this link for documentation full: https://devopscube.com/kubernetes-clu
 
 Looking for exam-style Istio practice? Check out the [ICA Istio Traffic-Management Module](docs/istio-traffic-module.md) with 22 progressively harder VirtualService/DestinationRule tasks, YAML solutions, verification tips, and doc references tailored for this Vagrant lab.
 
+Want a full mock exam run? Use the [Mock Exam Guide](docs/mock-exam.md) plus `check-exam.sh` to score 16 hands-on tasks (pass threshold 68/100).
+
 
 ## Prerequisites
 

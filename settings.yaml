@@ -37,3 +37,4 @@ software:
   kubernetes: 1.31.0-*
 
   os: xUbuntu_24.04
+exam_mode: true

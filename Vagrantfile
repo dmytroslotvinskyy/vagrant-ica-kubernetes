@@ -59,6 +59,9 @@ Vagrant.configure("2") do |config|
       },
       path: "scripts/master.sh"
     controlplane.vm.provision "shell", run: "always", path: "scripts/istio-ica-lab.sh"
+    if settings["exam_mode"]
+      controlplane.vm.provision "shell", run: "always", path: "scripts/exam-setup.sh"
+    end
     controlplane.vm.provision "shell",
       env: {
         "SSH_USER" => "student",
