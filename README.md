@@ -56,6 +56,10 @@ The setup is updated with 1.31 cluster version.
 
 Refer to this link for documentation full: https://devopscube.com/kubernetes-cluster-vagrant/
 
+## ICA Istio Traffic-Management Lab Module
+
+Looking for exam-style Istio practice? Check out the [ICA Istio Traffic-Management Module](docs/istio-traffic-module.md) with 22 progressively harder VirtualService/DestinationRule tasks, YAML solutions, verification tips, and doc references tailored for this Vagrant lab.
+
 
 ## Prerequisites
 
