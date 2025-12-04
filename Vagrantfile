@@ -2,6 +2,7 @@
 require "yaml"
 vagrant_root = File.dirname(File.expand_path(__FILE__))
 settings = YAML.load_file "#{vagrant_root}/settings.yaml"
+MIN_MEMORY_MB = 2048
 
 IP_SECTIONS = settings["network"]["control_ip"].match(/^([0-9.]+\.)([^.]+)$/)
 # First 3 octets including the trailing dot:
@@ -36,7 +37,12 @@ Vagrant.configure("2") do |config|
     end
     controlplane.vm.provider "virtualbox" do |vb|
         vb.cpus = settings["nodes"]["control"]["cpu"]
-        vb.memory = settings["nodes"]["control"]["memory"]
+        requested_memory = settings["nodes"]["control"]["memory"].to_i
+        if requested_memory < MIN_MEMORY_MB
+          warn "Requested control-plane memory #{requested_memory}MB is below the supported minimum of #{MIN_MEMORY_MB}MB. Using #{MIN_MEMORY_MB}MB instead."
+          requested_memory = MIN_MEMORY_MB
+        end
+        vb.memory = requested_memory
         if settings["cluster_name"] and settings["cluster_name"] != ""
           vb.customize ["modifyvm", :id, "--groups", ("/" + settings["cluster_name"])]
         end
@@ -88,7 +94,12 @@ Vagrant.configure("2") do |config|
       end
       node.vm.provider "virtualbox" do |vb|
           vb.cpus = settings["nodes"]["workers"]["cpu"]
-          vb.memory = settings["nodes"]["workers"]["memory"]
+          requested_memory = settings["nodes"]["workers"]["memory"].to_i
+          if requested_memory < MIN_MEMORY_MB
+            warn "Requested worker memory #{requested_memory}MB is below the supported minimum of #{MIN_MEMORY_MB}MB. Using #{MIN_MEMORY_MB}MB instead."
+            requested_memory = MIN_MEMORY_MB
+          end
+          vb.memory = requested_memory
           if settings["cluster_name"] and settings["cluster_name"] != ""
             vb.customize ["modifyvm", :id, "--groups", ("/" + settings["cluster_name"])]
           end
