@@ -68,6 +68,15 @@ Vagrant.configure("2") do |config|
     if settings["exam_mode"]
       controlplane.vm.provision "shell", run: "always", path: "scripts/exam-setup.sh"
     end
+    controlplane.vm.provision "shell", run: "always", inline: <<-SHELL
+      echo "[exam-env] Preparing tmux helper session (requires tmux inside the VM)"
+      if command -v tmux >/dev/null 2>&1; then
+        sudo /vagrant/scripts/exam-env.sh >/var/log/exam-env.log 2>&1 || true
+        echo "[exam-env] Tmux helper ready. Attach with: tmux attach -t exam"
+      else
+        echo "[exam-env] tmux not installed; install with 'sudo apt install tmux' then run /vagrant/scripts/exam-env.sh"
+      fi
+    SHELL
     controlplane.vm.provision "shell",
       env: {
         "SSH_USER" => "student",
