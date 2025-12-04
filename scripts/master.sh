@@ -5,16 +5,43 @@
 set -euxo pipefail
 
 NODENAME=$(hostname -s)
+ADMIN_KUBECONFIG=/etc/kubernetes/admin.conf
 
-sudo kubeadm config images pull
+cluster_initialized=false
+if [ -f "$ADMIN_KUBECONFIG" ]; then
+  if kubectl --kubeconfig="$ADMIN_KUBECONFIG" get node "$NODENAME" >/dev/null 2>&1; then
+    cluster_initialized=true
+    echo "[master] kubeadm already initialized on ${NODENAME}; skipping control-plane bootstrap."
+  fi
+fi
 
-echo "Preflight Check Passed: Downloaded All Required Images"
+if [ "$cluster_initialized" = false ]; then
+  sudo kubeadm config images pull
 
-sudo kubeadm init --apiserver-advertise-address=$CONTROL_IP --apiserver-cert-extra-sans=$CONTROL_IP --pod-network-cidr=$POD_CIDR --service-cidr=$SERVICE_CIDR --node-name "$NODENAME" --ignore-preflight-errors Swap
+  echo "Preflight Check Passed: Downloaded All Required Images"
 
-mkdir -p "$HOME"/.kube
-sudo cp -i /etc/kubernetes/admin.conf "$HOME"/.kube/config
-sudo chown "$(id -u)":"$(id -g)" "$HOME"/.kube/config
+  sudo kubeadm init --apiserver-advertise-address=$CONTROL_IP --apiserver-cert-extra-sans=$CONTROL_IP --pod-network-cidr=$POD_CIDR --service-cidr=$SERVICE_CIDR --node-name "$NODENAME" --ignore-preflight-errors Swap
+
+  mkdir -p "$HOME"/.kube
+  sudo cp -i $ADMIN_KUBECONFIG "$HOME"/.kube/config
+  sudo chown "$(id -u)":"$(id -g)" "$HOME"/.kube/config
+
+  # Install Calico Network Plugin
+  curl https://raw.githubusercontent.com/projectcalico/calico/v${CALICO_VERSION}/manifests/calico.yaml -O
+  kubectl apply -f calico.yaml
+
+  sudo -i -u vagrant bash << EOF
+whoami
+mkdir -p /home/vagrant/.kube
+sudo cp -i /etc/kubernetes/admin.conf /home/vagrant/.kube/
+sudo chown 1000:1000 /home/vagrant/.kube/config
+EOF
+
+  # Install Metrics Server
+  kubectl apply -f https://raw.githubusercontent.com/techiescamp/kubeadm-scripts/main/manifests/metrics-server.yaml
+else
+  echo "[master] Skipping kubeadm init/Calico/metrics install; cluster already configured."
+fi
 
 # Save Configs to shared /Vagrant location
 
@@ -33,21 +60,4 @@ touch $config_path/join.sh
 chmod +x $config_path/join.sh
 
 kubeadm token create --print-join-command > $config_path/join.sh
-
-# Install Calico Network Plugin
-
-curl https://raw.githubusercontent.com/projectcalico/calico/v${CALICO_VERSION}/manifests/calico.yaml -O
-
-kubectl apply -f calico.yaml
-
-sudo -i -u vagrant bash << EOF
-whoami
-mkdir -p /home/vagrant/.kube
-sudo cp -i $config_path/config /home/vagrant/.kube/
-sudo chown 1000:1000 /home/vagrant/.kube/config
-EOF
-
-# Install Metrics Server
-
-kubectl apply -f https://raw.githubusercontent.com/techiescamp/kubeadm-scripts/main/manifests/metrics-server.yaml
 

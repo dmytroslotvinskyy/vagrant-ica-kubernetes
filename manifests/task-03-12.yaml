@@ -1,0 +1,174 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: GatewayClass
+metadata:
+  name: istio
+spec:
+  controllerName: istio.io/gateway-controller
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: httpbin-gw
+  namespace: default
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - httpbin.com
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: httpbin-vs
+  namespace: default
+spec:
+  hosts:
+  - httpbin.com
+  gateways:
+  - httpbin-gw
+  http:
+  - route:
+    - destination:
+        host: httpbin.default.svc.cluster.local
+        port:
+          number: 8000
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: Gateway
+metadata:
+  name: httpbin-kgw
+  namespace: default
+spec:
+  gatewayClassName: istio
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    hostname: httpbin.com
+    allowedRoutes:
+      namespaces:
+        from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: HTTPRoute
+metadata:
+  name: httpbin-route
+  namespace: default
+spec:
+  parentRefs:
+  - name: httpbin-kgw
+  hostnames:
+  - httpbin.com
+  rules:
+  - backendRefs:
+    - name: httpbin
+      port: 8000
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: payments-dr
+  namespace: payments
+spec:
+  host: payments
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: payments-vs
+  namespace: payments
+spec:
+  hosts:
+  - payments
+  http:
+  - route:
+    - destination:
+        host: payments
+        subset: v1
+      weight: 70
+    - destination:
+        host: payments
+        subset: v2
+      weight: 30
+    timeout: 2s
+    retries:
+      attempts: 3
+      perTryTimeout: 1s
+      retryOn: 5xx,connect-failure,refused-stream
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: helloworld-match-vs
+  namespace: default
+spec:
+  hosts:
+  - helloworld.default.svc.cluster.local
+  http:
+  - match:
+    - uri:
+        prefix: /v1
+    rewrite:
+      uri: /hello
+    route:
+    - destination:
+        host: helloworld.default.svc.cluster.local
+        subset: v1
+  - match:
+    - uri:
+        prefix: /v2
+    fault:
+      delay:
+        fixedDelay: 2s
+        percentage:
+          value: 20
+    rewrite:
+      uri: /hello
+    route:
+    - destination:
+        host: helloworld.default.svc.cluster.local
+        subset: v2
+  - route:
+    - destination:
+        host: helloworld.default.svc.cluster.local
+        subset: v1
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: helloworld-cb
+  namespace: default
+spec:
+  host: helloworld
+  trafficPolicy:
+    connectionPool:
+      http:
+        http1MaxPendingRequests: 1
+        http2MaxRequests: 1
+        maxRequestsPerConnection: 1
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: fakeservice-od
+  namespace: default
+spec:
+  host: fakeservice
+  trafficPolicy:
+    outlierDetection:
+      consecutive5xxErrors: 1
+      interval: 5s
+      baseEjectionTime: 3m
+      maxEjectionPercent: 100

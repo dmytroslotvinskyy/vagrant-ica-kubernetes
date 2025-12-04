@@ -60,7 +60,16 @@ Refer to this link for documentation full: https://devopscube.com/kubernetes-clu
 
 Looking for exam-style Istio practice? Check out the [ICA Istio Traffic-Management Module](docs/istio-traffic-module.md) with 22 progressively harder VirtualService/DestinationRule tasks, YAML solutions, verification tips, and doc references tailored for this Vagrant lab.
 
-Want a full mock exam run? Use the [Mock Exam Guide](docs/mock-exam.md) plus `check-exam.sh` to score 16 hands-on tasks (pass threshold 68/100).
+Want a full mock exam run? Use the [Mock Exam Guide](docs/mock-exam.md) plus `check-exam.sh` to score 16 hands-on tasks (pass threshold 68/100). The checker now finishes with a zch-like scoreboard showing PASS/FAIL/SKIP for every task along with earned points so you can share results quickly.
+
+Mock exam quick start:
+
+1. `vagrant up && vagrant ssh controlplane`
+   - Re-running `vagrant provision controlplane` is now quick: the bootstrap scripts detect an already-initialized cluster and skip the expensive `kubeadm init`/`kubeadm join` steps, so you can refresh Istio + the lab workloads without tearing down the VMs.
+2. Optional TUI helper: `sudo /vagrant/scripts/exam-env.sh` (left pane shows the live task list, right pane is your shell; reconnect later with `tmux attach -t exam`)
+3. Read the full prompts in `/vagrant/exam-tasks.md` (rendered automatically in the helper)
+4. Run `sudo /vagrant/check-exam.sh` (no args = all tasks, or pass numbers like `5 6 7`)
+5. Use the scoreboard summary plus [`docs/mock-exam.md`](docs/mock-exam.md) for remediation tips.
 
 
 ## Prerequisites
