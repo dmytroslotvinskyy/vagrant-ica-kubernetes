@@ -13,6 +13,51 @@ LAB_NAMESPACES=(
   shipping api docs billing web bookinfo media analytics notifications
   flaky experiment
 )
+EXAM_NAMESPACES=(default payments swagger)
+
+wait_for_cluster_nodes() {
+  local min_nodes=2
+  local timeout_seconds=900
+  local interval=10
+  local waited=0
+  local last_node_output=""
+  echo "[istio-ica-lab] Waiting for at least ${min_nodes} Kubernetes nodes to be Ready before installing Istio"
+  while [ "$waited" -lt "$timeout_seconds" ]; do
+    if ! node_output=$(kubectl get nodes --no-headers 2>/dev/null); then
+      sleep "$interval"
+      waited=$((waited + interval))
+      continue
+    fi
+    last_node_output="$node_output"
+    local total_nodes
+    total_nodes=$(printf "%s\n" "$node_output" | sed '/^\s*$/d' | wc -l | tr -d ' ')
+    if [ "$total_nodes" -lt "$min_nodes" ]; then
+      echo "[istio-ica-lab] Detected $total_nodes node(s). Waiting for workers to join..."
+      sleep "$interval"
+      waited=$((waited + interval))
+      continue
+    fi
+    if printf "%s\n" "$node_output" | awk '$2 != "Ready" {exit 1}'; then
+      echo "[istio-ica-lab] All nodes Ready:"
+      printf "%s\n" "$node_output"
+      return 0
+    else
+      pending_nodes=$(printf "%s\n" "$node_output" | awk '$2 != "Ready" {print $1}')
+      echo "[istio-ica-lab] Waiting for node(s) to become Ready: $pending_nodes"
+      sleep "$interval"
+      waited=$((waited + interval))
+    fi
+  done
+  echo "[istio-ica-lab] Timed out after ${timeout_seconds}s waiting for all nodes to become Ready."
+  if [ -n "$last_node_output" ]; then
+    echo "[istio-ica-lab] Last observed node status:"
+    printf "%s\n" "$last_node_output"
+  fi
+  echo "[istio-ica-lab] Proceeding in degraded mode by removing controlplane taints so workloads can schedule there."
+  kubectl taint nodes controlplane node-role.kubernetes.io/control-plane- 2>/dev/null || true
+  kubectl taint nodes controlplane node-role.kubernetes.io/master- 2>/dev/null || true
+  return 0
+}
 
 install_istioctl() {
   if command -v istioctl >/dev/null 2>&1; then
@@ -36,11 +81,12 @@ install_istio_control_plane() {
     return
   fi
 
+  wait_for_cluster_nodes
+
   echo "[istio-ica-lab] Installing Istio control plane (demo profile)"
   local attempts=0
   local max_attempts=3
-  local timeout="${ISTIO_INSTALL_TIMEOUT:-10m}"
-  until istioctl install --set profile=demo --wait --timeout="${timeout}" -y; do
+  until istioctl install --set profile=demo -y; do
     attempts=$((attempts + 1))
     if [ "$attempts" -ge "$max_attempts" ]; then
       echo "[istio-ica-lab] Failed to install Istio after ${attempts} attempts"
@@ -195,7 +241,7 @@ spec:
     spec:
       containers:
       - name: ${name}
-        image: curlimages/curl
+        image: docker.io/curlimages/curl:8.12.1
         command: ["/bin/sleep", "infinity"]
 YAML
 }
@@ -328,11 +374,40 @@ apply_lab_workloads() {
 }
 
 chmod_host_scripts() {
-  for f in /vagrant/tasks.sh /vagrant/check-ica.sh; do
+  for f in /vagrant/tasks.sh /vagrant/check-exam.sh /vagrant/scripts/tasks-viewer.sh /vagrant/scripts/exam-env.sh /vagrant/scripts/exam-scoreboard.sh; do
     if [ -f "$f" ]; then
       chmod +x "$f" || true
     fi
   done
+}
+
+verify_lab_health() {
+  echo "[istio-ica-lab] Verifying Istio control plane health"
+  kubectl wait -n istio-system deploy/istiod --for=condition=Available --timeout=600s
+  kubectl wait -n istio-system deploy/istio-ingressgateway --for=condition=Available --timeout=600s
+  kubectl get pods -n istio-system
+
+  echo "[istio-ica-lab] Ensuring exam namespaces exist"
+  for ns in "${EXAM_NAMESPACES[@]}"; do
+    if ! kubectl get ns "$ns" >/dev/null 2>&1; then
+      echo "[istio-ica-lab] Creating missing namespace: $ns"
+      kubectl create ns "$ns"
+    fi
+  done
+  echo "[istio-ica-lab] Node status summary"
+  if node_status=$(kubectl get nodes --no-headers 2>/dev/null); then
+    kubectl get nodes
+    if printf "%s\n" "$node_status" | awk '$2 != "Ready" {exit 1}'; then
+      echo "[istio-ica-lab] All nodes Ready."
+    else
+      degraded_nodes=$(printf "%s\n" "$node_status" | awk '$2 != "Ready" {print $1 ":" $2}')
+      echo "[istio-ica-lab] WARNING: Some nodes are not Ready (degraded mode): $degraded_nodes"
+      echo "[istio-ica-lab] Workloads will continue to schedule on controlplane due to the earlier taint removal."
+    fi
+  else
+    echo "[istio-ica-lab] Unable to fetch node status; please manually run 'kubectl get nodes'."
+  fi
+  echo "[istio-ica-lab] Cluster verification complete. Start the tmux exam helper via: sudo /vagrant/scripts/exam-env.sh"
 }
 
 install_istioctl
@@ -340,6 +415,7 @@ install_istio_control_plane
 prepare_namespaces
 apply_lab_workloads
 chmod_host_scripts
+verify_lab_health
 
 echo "[istio-ica-lab] Done. Log in with: vagrant ssh controlplane"
-echo "[istio-ica-lab] Then run: /vagrant/tasks.sh  and  /vagrant/check-ica.sh"
+echo "[istio-ica-lab] Then run: /vagrant/tasks.sh, /vagrant/check-exam.sh, or /vagrant/scripts/exam-env.sh"
