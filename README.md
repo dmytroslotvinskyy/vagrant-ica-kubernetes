@@ -64,18 +64,29 @@ Want a full mock exam run? Use the [Mock Exam Guide](docs/mock-exam.md) plus `ch
 
 Mock exam quick start:
 
-1. `vagrant up && vagrant ssh controlplane`
-   - Re-running `vagrant provision controlplane` is now quick: the bootstrap scripts detect an already-initialized cluster and skip the expensive `kubeadm init`/`kubeadm join` steps, so you can refresh Istio + the lab workloads without tearing down the VMs.
+1. `vagrant up` (controlplane auto-starts worker and the lightweight client `node02`). Use `vagrant ssh node02` to work from the preloaded kubectl workstation (kubeconfig synced from `/vagrant/configs/config`), or `vagrant ssh controlplane` if you prefer working on the control plane.
+   - Re-running `vagrant provision controlplane` is quick: the bootstrap scripts detect an already-initialized cluster and skip the expensive `kubeadm init`/`kubeadm join` steps, so you can refresh Istio + the lab workloads without tearing down the VMs.
 2. Optional TUI helper: `sudo /vagrant/scripts/exam-env.sh` (left pane shows the live task list, the top-right pane is your shell, and the bottom-right pane auto-refreshes the scoreboard via `/vagrant/check-exam.sh`; detach with `Ctrl-b d` and reconnect with `tmux attach -t exam`)
 3. Read the full prompts in `/vagrant/exam-tasks.md` (rendered automatically in the helper)
 4. Run `sudo /vagrant/check-exam.sh` (no args = all tasks, or pass numbers like `5 6 7`)
 5. Use the scoreboard summary plus [`docs/mock-exam.md`](docs/mock-exam.md) for remediation tips.
 
+### Web-based task navigator (Bun)
+
+Prefer a richer UI or want to follow the tasks from your host? A Bun-powered dashboard now lives under `apps/exam-ui`:
+
+```bash
+cd apps/exam-ui
+bun run dev
+```
+
+This watches `exam-tasks.md`, serves a responsive split-pane experience on <http://localhost:4173>, and syncs your personal flags via `localStorage`. Set `TASK_FILE=/custom/path` if you maintain alternate task lists.
+
 
 ## Prerequisites
 
 1. Working Vagrant setup
-2. 8 Gig + RAM workstation as the Vms use 3 vCPUS and 4+ GB RAM
+2. 8 GB+ RAM workstation; each VM is capped at 2 GB (controlplane, node01, and client node02).
 
 ## For MAC/Linux Users
 

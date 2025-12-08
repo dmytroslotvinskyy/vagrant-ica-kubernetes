@@ -1,0 +1,255 @@
+﻿:root {
+  color-scheme: dark;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  background-color: #0f1117;
+  color: #f3f3f3;
+  --sidebar-width: 320px;
+  --accent: #9be0ff;
+  --accent-strong: #3bb3ff;
+  --border: rgba(255, 255, 255, 0.08);
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-strong: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid var(--border);
+  padding: 2rem 1.5rem;
+  background: rgba(15, 17, 23, 0.9);
+  backdrop-filter: blur(16px);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.brand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.pill {
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.8rem;
+}
+
+.controls {
+  margin-top: 1.5rem;
+}
+
+.controls input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.65rem 1rem;
+  color: white;
+}
+
+.controls input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.filter-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.chip {
+  flex: 1;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--surface);
+  color: white;
+  padding: 0.4rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.chip--active {
+  background: var(--accent-strong);
+  color: #051726;
+  font-weight: 600;
+}
+
+.task-list {
+  list-style: none;
+  padding: 0;
+  margin: 2rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.task-item {
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: background 0.2s, border 0.2s;
+}
+
+.task-item button {
+  border: none;
+  color: inherit;
+  background: none;
+  font: inherit;
+  width: 100%;
+  text-align: left;
+  padding: 0.9rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+  cursor: pointer;
+}
+
+.task-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.task-meta span {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.task-item.active {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+
+.task-item .flag {
+  font-size: 1rem;
+  opacity: 0.35;
+}
+
+.task-item.flagged .flag {
+  opacity: 1;
+  color: var(--accent-strong);
+}
+
+.content {
+  padding: 2.5rem 3rem;
+  background: radial-gradient(circle at top, rgba(69, 159, 255, 0.08), transparent 45%), #05060b;
+  min-height: 100vh;
+}
+
+.task-detail {
+  max-width: 820px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  padding: 2rem 2.5rem;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+
+.task-detail header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.task-detail h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.tag {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.8rem;
+}
+
+.flag-toggle {
+  border: none;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.flag-toggle.active {
+  background: rgba(255, 0, 102, 0.2);
+  color: #ff81b5;
+}
+
+.flag-toggle:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.task-body {
+  margin-top: 1.5rem;
+  line-height: 1.6;
+}
+
+.task-body p {
+  margin: 0 0 1rem;
+}
+
+.task-body ul {
+  margin: 0 0 1rem 1.25rem;
+  padding: 0;
+}
+
+.task-body code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.15rem 0.35rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.placeholder {
+  text-align: center;
+  padding: 3rem 0;
+}
+
+@media (max-width: 1024px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    position: relative;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}

@@ -1,0 +1,39 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Istio Exam Task Board</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div>
+            <p class="eyebrow">ICA Istio Lab</p>
+            <h1>Task Navigator</h1>
+          </div>
+          <span class="pill" id="taskCountLabel">16 tasks</span>
+        </div>
+        <div class="controls">
+          <input id="searchInput" type="search" placeholder="Search tasks…" aria-label="Search tasks" />
+          <div class="filter-row">
+            <button id="filterAll" class="chip chip--active" data-filter="all">All</button>
+            <button id="filterFlagged" class="chip" data-filter="flagged">Flagged</button>
+          </div>
+        </div>
+        <ol id="taskList" class="task-list" aria-live="polite"></ol>
+      </aside>
+      <main class="content">
+        <section id="taskDetail" class="task-detail">
+          <div class="placeholder">
+            <h2>Select a task</h2>
+            <p>Use the navigation on the left to preview the full requirements, add personal flags, and keep track of progress while you work through the mock exam.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
