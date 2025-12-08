@@ -71,16 +71,61 @@ Mock exam quick start:
 4. Run `sudo /vagrant/check-exam.sh` (no args = all tasks, or pass numbers like `5 6 7`)
 5. Use the scoreboard summary plus [`docs/mock-exam.md`](docs/mock-exam.md) for remediation tips.
 
-### Web-based task navigator (Bun)
+### Task navigator interfaces
 
-Prefer a richer UI or want to follow the tasks from your host? A Bun-powered dashboard now lives under `apps/exam-ui`:
+The lab includes **two task viewing options** powered by Bun:
+
+#### 1. Web UI (Browser-based)
+
+Prefer a richer UI or want to follow tasks from your host? Launch the web dashboard:
 
 ```bash
 cd apps/exam-ui
 bun run dev
 ```
 
-This watches `exam-tasks.md`, serves a responsive split-pane experience on <http://localhost:4173>, and syncs your personal flags via `localStorage`. Set `TASK_FILE=/custom/path` if you maintain alternate task lists.
+This watches `exam-tasks.md`, serves a responsive split-pane experience on <http://localhost:4173>, and syncs your personal flags via `localStorage`. Perfect for side-by-side viewing on a second monitor.
+
+#### 2. Terminal TUI (tmux-friendly)
+
+Want a JavaScript-powered interface directly in your terminal? Use the TUI:
+
+```bash
+sudo /vagrant/scripts/exam-tui-bun.sh
+```
+
+This helper installs Bun (if missing), ensures `/vagrant/apps/exam-ui` dependencies are present, and launches the tmux layout automatically.
+
+Prefer to run it manually? You can still start the TUI without tmux automation:
+
+```bash
+cd /vagrant/apps/exam-ui
+bun install      # First time only
+bun run tui
+```
+
+Or launch the full exam environment with the TUI automatically loaded:
+
+```bash
+sudo /vagrant/scripts/exam-env-tui.sh
+```
+
+This creates a 3-pane tmux layout with:
+- **Left pane:** JavaScript TUI task navigator (vim keys, search with `/`, flag with `f`)
+- **Top-right:** Your work shell
+- **Bottom-right:** Auto-refreshing scoreboard
+
+Navigate panes with `F1`/`F2`/`F3`, restart the scoreboard with `F5`. The TUI shares flag storage with the web UI, so your progress syncs across both interfaces.
+
+**Keyboard shortcuts:**
+- `j`/`k` or arrows: Navigate tasks
+- `/`: Search tasks
+- `f`: Toggle flag on current task
+- `a`: Show all tasks
+- `Shift+F`: Show flagged only
+- `q` or `Esc`: Quit
+
+Both interfaces parse the same `exam-tasks.md` and store flags in `~/.ica-task-flags`, so you can switch between them seamlessly. Set `TASK_FILE=/custom/path` if you maintain alternate task lists.
 
 
 ## Prerequisites
