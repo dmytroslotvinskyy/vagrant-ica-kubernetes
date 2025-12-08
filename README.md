@@ -88,27 +88,22 @@ This watches `exam-tasks.md`, serves a responsive split-pane experience on <http
 
 #### 2. Terminal TUI (tmux-friendly)
 
-Want a JavaScript-powered interface directly in your terminal? Use the TUI:
+Want a JavaScript-powered interface directly in your terminal? Kick everything off with a single command:
 
 ```bash
 sudo /vagrant/scripts/exam-tui-bun.sh
 ```
 
-This helper installs Bun (if missing), ensures `/vagrant/apps/exam-ui` dependencies are present, and launches the tmux layout automatically.
+This helper installs Bun (plus `unzip`), syncs the TUI into `/tmp/exam-ui`, installs dependencies, and launches the tmux layout automatically (left pane = TUI, top-right = shell, bottom-right = scoreboard). Reattach later with `tmux attach -t exam`.
 
-Prefer to run it manually? You can still start the TUI without tmux automation:
+Prefer to run the TUI manually (outside tmux)? After Bun is on your PATH:
 
 ```bash
 cd /vagrant/apps/exam-ui
-bun install      # First time only
 bun run tui
 ```
 
-Or launch the full exam environment with the TUI automatically loaded:
-
-```bash
-sudo /vagrant/scripts/exam-env-tui.sh
-```
+Need the plain Bash viewer? `sudo /vagrant/scripts/exam-env.sh` is still available.
 
 This creates a 3-pane tmux layout with:
 - **Left pane:** JavaScript TUI task navigator (vim keys, search with `/`, flag with `f`)

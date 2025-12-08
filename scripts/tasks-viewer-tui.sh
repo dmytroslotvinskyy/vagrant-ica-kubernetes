@@ -9,6 +9,9 @@ TASK_FILE="${TASK_FILE:-/vagrant/exam-tasks.md}"
 FLAG_FILE="${FLAG_FILE:-$HOME/.ica-task-flags}"
 TUI_DIR="${TUI_DIR:-/vagrant/apps/exam-ui}"
 
+# Ensure Bun binaries are discoverable even for non-login shells (tmux panes, sudo, etc.)
+export PATH="/root/.bun/bin:/home/vagrant/.bun/bin:${PATH}"
+
 # Verify task file exists
 if [ ! -f "$TASK_FILE" ]; then
   echo "Error: Task file not found at $TASK_FILE"
