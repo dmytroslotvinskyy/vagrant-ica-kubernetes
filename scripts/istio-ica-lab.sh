@@ -396,7 +396,16 @@ apply_lab_workloads() {
 }
 
 chmod_host_scripts() {
-  for f in /vagrant/tasks.sh /vagrant/check-exam.sh /vagrant/scripts/tasks-viewer.sh /vagrant/scripts/exam-env.sh /vagrant/scripts/exam-scoreboard.sh; do
+  for f in /vagrant/tasks.sh \
+           /vagrant/check-exam.sh \
+           /vagrant/scripts/tasks-viewer.sh \
+           /vagrant/scripts/exam-env.sh \
+           /vagrant/scripts/exam-scoreboard.sh \
+           /vagrant/scripts/tasks-viewer-tui.sh \
+           /vagrant/scripts/exam-env-tui.sh \
+           /vagrant/scripts/exam-tui-bun.sh \
+           /vagrant/scripts/install-bun.sh \
+           /vagrant/scripts/post-provision-bun.sh; do
     if [ -f "$f" ]; then
       chmod +x "$f" || true
     fi

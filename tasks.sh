@@ -8,10 +8,10 @@ Cluster workflow:
  1. `vagrant up` (or `vagrant provision controlplane`)
  2. `vagrant ssh controlplane`
  3. Solve tasks (YAML files under /vagrant or kubectl apply -f -)
- 4. `/vagrant/check-ica.sh <task-numbers>` to validate
-      • Example: `/vagrant/check-ica.sh 1` (just Task 1)
-      • `/vagrant/check-ica.sh 1 2 3` (multiple)
-      • `/vagrant/check-ica.sh all` (best-effort full suite; remember some tasks supersede previous configs)
+ 4. `/vagrant/check-exam.sh <task-numbers>` to validate
+      • Example: `/vagrant/check-exam.sh 1` (just Task 1)
+      • `/vagrant/check-exam.sh 1 2 3` (multiple)
+      • `/vagrant/check-exam.sh all` (best-effort full suite; remember some tasks supersede previous configs)
  5. Full write-ups + YAML solutions live in `docs/istio-traffic-module.md`.
 
 Namespaces, services, and sample deployments for every task are pre-created in the lab

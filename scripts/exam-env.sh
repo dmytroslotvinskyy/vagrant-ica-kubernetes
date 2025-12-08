@@ -7,6 +7,7 @@ WORK_CMD="${WORK_CMD:-cd ~ && bash}"
 SCOREBOARD_CMD="${SCOREBOARD_CMD:-/vagrant/scripts/exam-scoreboard.sh}"
 VIEWER_WIDTH="${VIEWER_WIDTH:-48}"
 SCOREBOARD_INTERVAL="${SCOREBOARD_INTERVAL:-180}"
+SCOREBOARD_PANE="${SCOREBOARD_PANE:-${SESSION_NAME}:0.2}"
 
 if ! command -v tmux >/dev/null 2>&1; then
   echo "tmux is required for this helper (run 'sudo apt install tmux')" >&2
@@ -25,5 +26,16 @@ tmux split-window -v -t "${SESSION_NAME}:0.1" "SCOREBOARD_INTERVAL=${SCOREBOARD_
 tmux select-pane -t "${SESSION_NAME}:0.1"
 tmux resize-pane -t "${SESSION_NAME}:0.0" -x "$VIEWER_WIDTH"
 tmux select-pane -t "${SESSION_NAME}:0.1"
+
+# Make the session friendlier: mouse navigation, quick pane jump keys, and a
+# one-key scoreboard restart (F5) if the checker crashed or you updated tasks.
+tmux set-option -t "$SESSION_NAME" mouse on
+tmux set-option -t "$SESSION_NAME" status-left "[exam] #{session_name}"
+tmux set-option -t "$SESSION_NAME" status-right "F1 tasks | F2 shell | F3 score | F5 restart"
+tmux bind-key -n F1 select-pane -t "${SESSION_NAME}:0.0"
+tmux bind-key -n F2 select-pane -t "${SESSION_NAME}:0.1"
+tmux bind-key -n F3 select-pane -t "$SCOREBOARD_PANE"
+tmux bind-key -n F5 respawn-pane -k -t "$SCOREBOARD_PANE" "SCOREBOARD_INTERVAL=${SCOREBOARD_INTERVAL} $SCOREBOARD_CMD"
+tmux display-message "[exam-env] Keys: F1 tasks | F2 shell | F3 scoreboard | F5 restart scoreboard"
 
 exec tmux attach -t "$SESSION_NAME"

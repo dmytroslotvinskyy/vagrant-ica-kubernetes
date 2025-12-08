@@ -178,7 +178,7 @@ spec:
       serviceAccountName: default
       containers:
       - name: curl
-        image: curlimages/curl
+        image: docker.io/curlimages/curl:8.12.1
         command: ["/bin/sleep","infinity"]
 YAML
 }

@@ -176,27 +176,31 @@ sys.exit(0 if ok else 1)
 }
 
 task_5() {
-  kubectl -n payments get destinationrule payments-dr >/dev/null 2>&1 || return 1
-  kubectl -n payments get virtualservice payments-vs >/dev/null 2>&1 || return 1
-  kubectl -n payments get destinationrule payments-dr -o json | python3 -c "
+  dr_json=$(kubectl -n payments get destinationrule payments-dr -o json 2>/dev/null) || return 1
+  [ -n "$dr_json" ] || return 1
+  python3 - <<'PY' <<<"$dr_json"
 import json,sys
 doc=json.load(sys.stdin)
 sub=doc.get('spec',{}).get('subsets',[])
 labels={item.get('name'):item.get('labels',{}).get('version') for item in sub}
 sys.exit(0 if labels.get('v1')=='v1' and labels.get('v2')=='v2' else 1)
-"
-  kubectl -n payments get virtualservice payments-vs -o json | python3 -c "
+PY
+
+  vs_json=$(kubectl -n payments get virtualservice payments-vs -o json 2>/dev/null) || return 1
+  [ -n "$vs_json" ] || return 1
+  python3 - <<'PY' <<<"$vs_json"
 import json,sys
 doc=json.load(sys.stdin)
 routes=doc.get('spec',{}).get('http',[{}])[0].get('route',[])
 weights={(r.get('destination',{}).get('subset'), r.get('weight')) for r in routes}
 sys.exit(0 if ('v1',70) in weights and ('v2',30) in weights else 1)
-"
+PY
 }
 
 task_6() {
-  kubectl -n default get virtualservice helloworld-match-vs >/dev/null 2>&1 || return 1
-  kubectl -n default get virtualservice helloworld-match-vs -o json | python3 -c "
+  vs_json=$(kubectl -n default get virtualservice helloworld-match-vs -o json 2>/dev/null) || return 1
+  [ -n "$vs_json" ] || return 1
+  python3 - <<'PY' <<<"$vs_json"
 import json,sys
 doc=json.load(sys.stdin)
 http=doc.get('spec',{}).get('http',[])
@@ -215,11 +219,13 @@ for rule in http:
     if not matches or matches==[{}]:
         fallback = subset=='v1'
 sys.exit(0 if all(found.values()) and fallback else 1)
-"
+PY
 }
 
 task_7() {
-  kubectl -n payments get virtualservice payments-vs -o json | python3 -c "
+  vs_json=$(kubectl -n payments get virtualservice payments-vs -o json 2>/dev/null) || return 1
+  [ -n "$vs_json" ] || return 1
+  python3 - <<'PY' <<<"$vs_json"
 import json,sys
 doc=json.load(sys.stdin)
 http=doc.get('spec',{}).get('http',[{}])[0]
@@ -228,11 +234,13 @@ retries=http.get('retries',{})
 cond = timeout=='2s' and retries.get('attempts')==3 and retries.get('perTryTimeout')=='1s'
 cond = cond and retries.get('retryOn')=='5xx,connect-failure,refused-stream'
 sys.exit(0 if cond else 1)
-"
+PY
 }
 
 task_8() {
-  kubectl -n default get virtualservice helloworld-match-vs -o json | python3 -c "
+  vs_json=$(kubectl -n default get virtualservice helloworld-match-vs -o json 2>/dev/null) || return 1
+  [ -n "$vs_json" ] || return 1
+  python3 - <<'PY' <<<"$vs_json"
 import json,sys
 doc=json.load(sys.stdin)
 rule=doc.get('spec',{}).get('http',[{}])
@@ -248,28 +256,32 @@ for entry in rule:
         if prefix=='/v2' and percent==20 and fixed=='2s':
             ok=True
 sys.exit(0 if ok else 1)
-"
+PY
 }
 
 task_9() {
-  kubectl -n default get destinationrule helloworld-cb -o json | python3 -c "
+  dr_json=$(kubectl -n default get destinationrule helloworld-cb -o json 2>/dev/null) || return 1
+  [ -n "$dr_json" ] || return 1
+  python3 - <<'PY' <<<"$dr_json"
 import json,sys
 doc=json.load(sys.stdin)
 http=doc.get('spec',{}).get('trafficPolicy',{}).get('connectionPool',{}).get('http',{})
 cond=http.get('http1MaxPendingRequests')==1 and http.get('http2MaxRequests')==1 and http.get('maxRequestsPerConnection')==1
 sys.exit(0 if cond else 1)
-"
+PY
 }
 
 task_10() {
-  kubectl -n default get destinationrule fakeservice-od -o json | python3 -c "
+  dr_json=$(kubectl -n default get destinationrule fakeservice-od -o json 2>/dev/null) || return 1
+  [ -n "$dr_json" ] || return 1
+  python3 - <<'PY' <<<"$dr_json"
 import json,sys
 doc=json.load(sys.stdin)
 od=doc.get('spec',{}).get('trafficPolicy',{}).get('outlierDetection',{})
 cond=od.get('consecutive5xxErrors')==1 and od.get('interval')=='5s'
 cond=cond and od.get('baseEjectionTime')=='3m' and od.get('maxEjectionPercent')==100
 sys.exit(0 if cond else 1)
-"
+PY
 }
 
 task_11() {
