@@ -6,11 +6,6 @@ set -euxo pipefail
 
 config_path="/vagrant/configs"
 
-if [ -f /etc/kubernetes/kubelet.conf ]; then
-  echo "[node] kubeadm join already completed on $(hostname -s); skipping re-join."
-  exit 0
-fi
-
 /bin/bash $config_path/join.sh -v
 
 sudo -i -u vagrant bash << EOF

@@ -10,14 +10,27 @@ IP_NW = IP_SECTIONS.captures[0]
 # Last octet excluding all dots:
 IP_START = Integer(IP_SECTIONS.captures[1])
 NUM_WORKER_NODES = settings["nodes"]["workers"]["count"]
+WORKER_VM_NAMES = (1..NUM_WORKER_NODES).map { |i| "node0#{i}" }
+CLIENT_SETTINGS = settings.dig("nodes", "client") || {}
+CLIENT_ENABLED = !!CLIENT_SETTINGS["enabled"]
+CLIENT_VM_NAME = CLIENT_SETTINGS["name"] || "node02"
+CLIENT_VM_IP = settings.dig("network", "client_ip") || (IP_NW + "#{IP_START + NUM_WORKER_NODES + 1}")
+AUTO_START_TARGETS = WORKER_VM_NAMES.dup
+AUTO_START_TARGETS << CLIENT_VM_NAME if CLIENT_ENABLED
 
 Vagrant.configure("2") do |config|
-  config.vm.provision "shell", env: { "IP_NW" => IP_NW, "IP_START" => IP_START, "NUM_WORKER_NODES" => NUM_WORKER_NODES }, inline: <<-SHELL
+  client_enabled_env = CLIENT_ENABLED ? "1" : "0"
+  config.vm.provision "shell", env: { "IP_NW" => IP_NW, "IP_START" => IP_START, "NUM_WORKER_NODES" => NUM_WORKER_NODES, "CLIENT_ENABLED" => client_enabled_env, "CLIENT_VM_IP" => CLIENT_VM_IP, "CLIENT_VM_NAME" => CLIENT_VM_NAME }, inline: <<-SHELL
       apt-get update -y
-      echo "$IP_NW$((IP_START)) controlplane" >> /etc/hosts
+      grep -q "$IP_NW$((IP_START)) controlplane" /etc/hosts || echo "$IP_NW$((IP_START)) controlplane" >> /etc/hosts
       for i in `seq 1 ${NUM_WORKER_NODES}`; do
-        echo "$IP_NW$((IP_START+i)) node0${i}" >> /etc/hosts
+        host_line="$IP_NW$((IP_START+i)) node0${i}"
+        grep -q "$host_line" /etc/hosts || echo "$host_line" >> /etc/hosts
       done
+      if [ "$CLIENT_ENABLED" = "1" ] && [ -n "$CLIENT_VM_IP" ] && [ -n "$CLIENT_VM_NAME" ]; then
+        host_line="$CLIENT_VM_IP $CLIENT_VM_NAME"
+        grep -q "$host_line" /etc/hosts || echo "$host_line" >> /etc/hosts
+      fi
   SHELL
 
   if `uname -m`.strip == "aarch64"
@@ -46,6 +59,18 @@ Vagrant.configure("2") do |config|
         if settings["cluster_name"] and settings["cluster_name"] != ""
           vb.customize ["modifyvm", :id, "--groups", ("/" + settings["cluster_name"])]
         end
+    end
+    if AUTO_START_TARGETS.any?
+      [:up, :reload, :provision].each do |action|
+        controlplane.trigger.before action do |trigger|
+          trigger.name = "auto-start-workers"
+          trigger.info = "[controlplane] Auto-starting lab nodes: #{AUTO_START_TARGETS.join(', ')}"
+          trigger.run = {
+            env: { "VAGRANT_CWD" => vagrant_root },
+            inline: "vagrant up #{AUTO_START_TARGETS.join(' ')}"
+          }
+        end
+      end
     end
     controlplane.vm.provision "shell",
       env: {
@@ -142,5 +167,49 @@ Vagrant.configure("2") do |config|
       end
     end
 
+  end
+
+  if CLIENT_ENABLED
+    client_cpu = CLIENT_SETTINGS["cpu"] || 1
+    client_memory = CLIENT_SETTINGS["memory"] || MIN_MEMORY_MB
+    config.vm.define CLIENT_VM_NAME do |client|
+      client.vm.hostname = CLIENT_VM_NAME
+      client.vm.network "private_network", ip: CLIENT_VM_IP
+      if settings["shared_folders"]
+        settings["shared_folders"].each do |shared_folder|
+          client.vm.synced_folder shared_folder["host_path"], shared_folder["vm_path"]
+        end
+      end
+      client.vm.provider "virtualbox" do |vb|
+        vb.cpus = client_cpu
+        requested_memory = client_memory.to_i
+        if requested_memory < MIN_MEMORY_MB
+          warn "Requested client memory #{requested_memory}MB is below the supported minimum of #{MIN_MEMORY_MB}MB. Using #{MIN_MEMORY_MB}MB instead."
+          requested_memory = MIN_MEMORY_MB
+        end
+        vb.memory = requested_memory
+        if settings["cluster_name"] and settings["cluster_name"] != ""
+          vb.customize ["modifyvm", :id, "--groups", ("/" + settings["cluster_name"])]
+        end
+      end
+      client.vm.provision "shell",
+        env: {
+          "KUBERNETES_VERSION" => settings["software"]["kubernetes"],
+          "KUBERNETES_VERSION_SHORT" => settings["software"]["kubernetes"][0..3]
+        },
+        path: "scripts/client.sh"
+      client.vm.provision "shell",
+        env: {
+          "SSH_USER" => "student",
+          "SSH_BANNER_MESSAGE" => "Authorized access only. Student lab node."
+        },
+        path: "scripts/ssh-setup.sh"
+      client.vm.provision "shell",
+        env: {
+          "SSH_USER" => "vagrant",
+          "SSH_BANNER_MESSAGE" => "Authorized access only. Student lab node."
+        },
+        path: "scripts/ssh-setup.sh"
+    end
   end
 end 

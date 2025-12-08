@@ -15,6 +15,28 @@ LAB_NAMESPACES=(
 )
 EXAM_NAMESPACES=(default payments swagger)
 
+distribute_kubeconfig() {
+  local admin_conf="/etc/kubernetes/admin.conf"
+  local vagrant_home="/home/vagrant"
+  local vagrant_kube_dir="${vagrant_home}/.kube"
+  local vagrant_kubeconfig="${vagrant_kube_dir}/config"
+  local shared_configs="/vagrant/configs"
+
+  if [ -f "$admin_conf" ]; then
+    mkdir -p "$vagrant_kube_dir"
+    cp "$admin_conf" "${vagrant_kubeconfig}.tmp"
+    mv "${vagrant_kubeconfig}.tmp" "$vagrant_kubeconfig"
+    chown -R vagrant:vagrant "$vagrant_kube_dir"
+    chmod 600 "$vagrant_kubeconfig"
+
+    if [ -d "$shared_configs" ]; then
+      cp "$admin_conf" "${shared_configs}/config.tmp"
+      mv "${shared_configs}/config.tmp" "${shared_configs}/config"
+      chmod 600 "${shared_configs}/config" || true
+    fi
+  fi
+}
+
 wait_for_cluster_nodes() {
   local min_nodes=2
   local timeout_seconds=900
@@ -412,6 +434,7 @@ verify_lab_health() {
 
 install_istioctl
 install_istio_control_plane
+distribute_kubeconfig
 prepare_namespaces
 apply_lab_workloads
 chmod_host_scripts

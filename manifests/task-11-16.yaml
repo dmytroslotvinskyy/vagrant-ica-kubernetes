@@ -1,0 +1,156 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: istio-system
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+    - job_name: 'prometheus'
+      static_configs:
+      - targets: ['localhost:9090']
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: istio-system
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.51.0
+        args:
+        - "--config.file=/etc/prometheus/prometheus.yml"
+        - "--storage.tsdb.path=/prometheus"
+        ports:
+        - containerPort: 9090
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+      volumes:
+      - name: config
+        configMap:
+          name: prometheus-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kiali
+  namespace: istio-system
+  labels:
+    app: kiali
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kiali
+  template:
+    metadata:
+      labels:
+        app: kiali
+    spec:
+      containers:
+      - name: kiali
+        image: docker.io/library/nginx:1.27
+        ports:
+        - containerPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: istio-system
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:1.55
+        ports:
+        - containerPort: 16686
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: swagger
+  labels:
+    istio.io/rev: latest
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: swagger-ui
+  namespace: swagger
+  labels:
+    app: swagger-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: swagger-ui
+  template:
+    metadata:
+      labels:
+        app: swagger-ui
+    spec:
+      containers:
+      - name: swagger-ui
+        image: swaggerapi/swagger-ui:v5.17.14
+        env:
+        - name: SWAGGER_JSON
+          value: /etc/swagger/sample.json
+        volumeMounts:
+        - name: swagger-spec
+          mountPath: /etc/swagger
+      volumes:
+      - name: swagger-spec
+        configMap:
+          name: swagger-sample
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: swagger-sample
+  namespace: swagger
+data:
+  sample.json: |
+    {
+      "openapi": "3.0.0",
+      "info": {
+        "title": "Sample",
+        "version": "1.0.0"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "responses": {
+              "200": {
+                "description": "pong"
+              }
+            }
+          }
+        }
+      }
+    }
