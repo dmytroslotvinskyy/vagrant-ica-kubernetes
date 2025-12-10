@@ -13,6 +13,10 @@ export PATH="${BUN_INSTALL_DIR}/bin:${PATH}"
 
 source /vagrant/scripts/tui-common.sh
 
+if [ -x /vagrant/scripts/ica-banner.sh ]; then
+  /vagrant/scripts/ica-banner.sh
+fi
+
 if ! kubectl get ns istio-system >/dev/null 2>&1; then
   echo "[exam-tui] istio-system namespace not found. Run lab bring-up first:"
   echo "  sudo /vagrant/scripts/lab-up.sh"

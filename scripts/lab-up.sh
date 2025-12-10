@@ -21,6 +21,18 @@ if [ -x /vagrant/scripts/verify-lab.sh ]; then
   /vagrant/scripts/verify-lab.sh || echo "[lab-up] verify-lab detected issues; review output above."
 fi
 
+if [ -x /vagrant/scripts/ica-banner.sh ]; then
+  echo "[lab-up] Installing login banner (/etc/profile.d/ica-lab.sh)"
+  cat <<'EOF' | sudo tee /etc/profile.d/ica-lab.sh >/dev/null
+#!/usr/bin/env bash
+# ICA lab greeting banner
+if [ -t 1 ] && [ -x /vagrant/scripts/ica-banner.sh ]; then
+  /vagrant/scripts/ica-banner.sh
+fi
+EOF
+  sudo chmod +x /etc/profile.d/ica-lab.sh || true
+fi
+
 echo "[lab-up] Next steps:"
 echo "  vagrant ssh controlplane"
 echo "  sudo /vagrant/scripts/exam-tui-bun.sh"
