@@ -55,7 +55,7 @@ wait_for_api() {
   local delay="${API_DELAY:-3}"
   local i
   for i in $(seq 1 "$retries"); do
-    if kubectl version --short >/dev/null 2>&1; then
+    if kubectl version --client --output=yaml >/dev/null 2>&1; then
       return 0
     fi
     echo "[verify-lab] API not reachable yet (attempt ${i}/${retries}); sleeping ${delay}s..."
@@ -124,6 +124,7 @@ main() {
     "$CHECKER_PATH" "${TASK_ARGS[@]}" || true
   else
     echo "[verify-lab] Checker script not found; skipped exam validation." >&2
+    echo "[verify-lab] Expected /vagrant/check-exam.sh (inside VM) or ./check-exam.sh (repo root). Did you copy the repo or update submodules/branch?" >&2
   fi
 }
 

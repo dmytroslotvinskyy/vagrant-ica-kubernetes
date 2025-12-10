@@ -41,6 +41,12 @@ load_flags() {
     [[ "$line" =~ ^[0-9]+$ ]] || continue
     FLAGGED["$line"]=1
   done < "$FLAG_FILE"
+  # Drop flags that refer to tasks beyond current count (e.g., task list shrank)
+  for idx in "${!FLAGGED[@]}"; do
+    if (( idx > TASK_COUNT )); then
+      unset "FLAGGED[$idx]"
+    fi
+  done
 }
 
 save_flags() {
@@ -171,6 +177,9 @@ main_loop() {
         ;;
       [Cc])
         clear_flags
+        ;;
+      \?)
+        STATUS_MESSAGE="Controls: [Enter|n|j]=next [p|k]=prev digits=jump f=flag c=clear flags q=quit"
         ;;
       *)
         if [[ "$input" =~ ^[0-9]+$ ]] && (( input >= 1 && input <= TASK_COUNT )); then

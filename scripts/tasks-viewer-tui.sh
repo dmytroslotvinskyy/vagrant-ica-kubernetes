@@ -12,6 +12,11 @@ TUI_DIR="${TUI_DIR:-/vagrant/apps/exam-ui}"
 # Ensure Bun binaries are discoverable even for non-login shells (tmux panes, sudo, etc.)
 export PATH="/root/.bun/bin:/home/vagrant/.bun/bin:${PATH}"
 
+# Shared helper for Bun/TUI setup
+if [ -f /vagrant/scripts/tui-common.sh ]; then
+  source /vagrant/scripts/tui-common.sh
+fi
+
 # Verify task file exists
 if [ ! -f "$TASK_FILE" ]; then
   echo "Error: Task file not found at $TASK_FILE"
@@ -49,17 +54,20 @@ if [ ! -d "$TUI_DIR" ]; then
   exec /vagrant/scripts/tasks-viewer.sh
 fi
 
-# Navigate to the TUI directory
-cd "$TUI_DIR"
-
-# Install dependencies if needed (only on first run or if node_modules is missing)
-export BUN_INSTALL_CACHE_DIR="${HOME}/.bun-cache"
-mkdir -p "$BUN_INSTALL_CACHE_DIR"
-
-if [ ! -d "node_modules" ]; then
-  echo "Installing TUI dependencies..."
-  BUN_INSTALL=copyfile bun install
-  echo ""
+# Stage and install dependencies using shared helper when available
+if declare -F prepare_tui_dir >/dev/null 2>&1; then
+  LOCAL_TUI_DIR="${LOCAL_TUI_DIR:-/tmp/exam-ui}"
+  prepare_tui_dir "$TUI_DIR" "$LOCAL_TUI_DIR"
+  cd "$LOCAL_TUI_DIR"
+else
+  cd "$TUI_DIR"
+  export BUN_INSTALL_CACHE_DIR="${HOME}/.bun-cache"
+  mkdir -p "$BUN_INSTALL_CACHE_DIR"
+  if [ ! -d "node_modules" ]; then
+    echo "Installing TUI dependencies..."
+    BUN_INSTALL=copyfile bun install
+    echo ""
+  fi
 fi
 
 # Export environment variables

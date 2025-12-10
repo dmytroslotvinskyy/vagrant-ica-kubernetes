@@ -4,6 +4,8 @@
 
 set -euo pipefail
 
+echo "[exam-env] Running as $(whoami)"
+
 SESSION_NAME="${SESSION_NAME:-exam}"
 VIEWER_CMD="${VIEWER_CMD:-/vagrant/scripts/tasks-viewer-tui.sh}"
 WORK_CMD="${WORK_CMD:-cd ~ && bash}"

@@ -99,7 +99,7 @@ install_istioctl() {
 
 install_istio_control_plane() {
   if kubectl get ns istio-system >/dev/null 2>&1; then
-    echo "[istio-ica-lab] Istio control plane already installed"
+    echo "[istio-ica-lab] Re-run detected; Istio control plane already installed. Refreshing workloads and checks only."
     return
   fi
 
@@ -128,6 +128,19 @@ prepare_namespaces() {
     fi
     kubectl label namespace "$ns" istio-injection=enabled --overwrite
   done
+}
+
+install_gateway_api_crds() {
+  local crd_url="https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.1.0/standard-install.yaml"
+  if kubectl get crd gatewayclasses.gateway.networking.k8s.io >/dev/null 2>&1; then
+    echo "[istio-ica-lab] Gateway API CRDs already installed"
+    return
+  fi
+  echo "[istio-ica-lab] Installing Gateway API CRDs (GatewayClass/Gateway/HTTPRoute)..."
+  kubectl apply -f "${crd_url}"
+  kubectl wait --for=condition=Established crd/gatewayclasses.gateway.networking.k8s.io --timeout=120s
+  kubectl wait --for=condition=Established crd/gateways.gateway.networking.k8s.io --timeout=120s
+  kubectl wait --for=condition=Established crd/httproutes.gateway.networking.k8s.io --timeout=120s
 }
 
 deploy_http_service() {
@@ -271,7 +284,7 @@ YAML
 apply_gateways() {
   cat <<'YAML' | kubectl apply -f -
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: Gateway
 metadata:
   name: public-gw
@@ -288,7 +301,7 @@ spec:
     - api.shop.example.com
     - admin.shop.internal
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: Gateway
 metadata:
   name: docs-gw
@@ -304,7 +317,7 @@ spec:
     hosts:
     - docs.example.com
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: Gateway
 metadata:
   name: bookinfo-gw
@@ -322,9 +335,113 @@ spec:
 YAML
 }
 
+deploy_httpbin() {
+  echo "[istio-ica-lab] Deploying httpbin (exam tasks 2,3,14,15)"
+  cat <<'YAML' | kubectl apply -f -
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: httpbin
+  namespace: default
+  labels:
+    app: httpbin
+spec:
+  ports:
+  - port: 8000
+    targetPort: 80
+    name: http
+  selector:
+    app: httpbin
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: httpbin
+  namespace: default
+  labels:
+    app: httpbin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: httpbin
+  template:
+    metadata:
+      labels:
+        app: httpbin
+    spec:
+      containers:
+      - name: httpbin
+        image: registry.k8s.io/istio/examples/httpbin@sha256:7f16c61f9b0fc25a9d4fa81f5482b5bee255ec4e2db4b2876d3e0f427b37e417
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+YAML
+}
+
+deploy_fakeservice() {
+  echo "[istio-ica-lab] Deploying fakeservice (exam task 10)"
+  cat <<'YAML' | kubectl apply -f -
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fakeservice
+  namespace: default
+  labels:
+    app: fakeservice
+spec:
+  selector:
+    app: fakeservice
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fakeservice
+  namespace: default
+  labels:
+    app: fakeservice
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: fakeservice
+  template:
+    metadata:
+      labels:
+        app: fakeservice
+    spec:
+      containers:
+      - name: fakeservice
+        image: hashicorp/http-echo
+        args:
+        - "-text=fakeservice backend"
+        - "-listen=:8080"
+        ports:
+        - containerPort: 8080
+YAML
+}
+
+restart_default_ns_workloads() {
+  echo "[istio-ica-lab] Restarting default namespace deployments to inject sidecars"
+  for deploy in $(kubectl -n default get deploy -o name 2>/dev/null); do
+    kubectl -n default rollout restart "$deploy" || true
+  done
+  echo "[istio-ica-lab] Waiting for default namespace pods to be ready..."
+  kubectl -n default wait --for=condition=available deploy --all --timeout=300s || true
+}
+
 apply_lab_workloads() {
   echo "[istio-ica-lab] Applying sample workloads for ICA tasks"
 
+  # Core exam workloads in default namespace
+  deploy_httpbin
+  deploy_fakeservice
   deploy_http_service default helloworld 5000 v1 v2
   deploy_client default curl curl
 
@@ -445,7 +562,9 @@ install_istioctl
 install_istio_control_plane
 distribute_kubeconfig
 prepare_namespaces
+install_gateway_api_crds
 apply_lab_workloads
+restart_default_ns_workloads
 chmod_host_scripts
 verify_lab_health
 
