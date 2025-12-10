@@ -120,6 +120,32 @@ Vagrant.configure("2") do |config|
         "SSH_BANNER_MESSAGE" => "Authorized access only. Student lab node."
       },
       path: "scripts/ssh-setup.sh"
+    # Force the Istio/ICA lab setup once the cluster is healthy (all nodes ready).
+    if EXAM_MODE
+      controlplane.vm.provision "shell", run: "always", inline: <<-SHELL
+        echo "[istio-ica-lab] Forcing lab-up.sh after nodes are ready."
+        expected_nodes=$((#{NUM_WORKER_NODES} + 1))
+        attempts=0
+        max_attempts=60
+        sleep_seconds=10
+        while true; do
+          ready=$(kubectl get nodes --no-headers 2>/dev/null | awk '$2 ~ /Ready/ {c++} END {print c+0}')
+          total=$(kubectl get nodes --no-headers 2>/dev/null | wc -l || echo 0)
+          if [ "$ready" -ge "$expected_nodes" ]; then
+            echo "[istio-ica-lab] Nodes Ready: $ready/$expected_nodes (total seen: $total)"
+            break
+          fi
+          attempts=$((attempts + 1))
+          if [ "$attempts" -ge "$max_attempts" ]; then
+            echo "[istio-ica-lab] WARNING: Nodes not ready after $max_attempts checks; proceeding anyway."
+            break
+          fi
+          echo "[istio-ica-lab] Waiting for nodes to be Ready ($ready/$expected_nodes)..."
+          sleep "$sleep_seconds"
+        done
+        sudo bash /vagrant/scripts/lab-up.sh
+      SHELL
+    end
   end
 
   (1..NUM_WORKER_NODES).each do |i|
