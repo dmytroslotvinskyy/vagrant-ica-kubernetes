@@ -11,5 +11,8 @@
   "dependencies": {
     "@types/blessed": "^0.1.25",
     "blessed": "^0.1.81"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
   }
 }

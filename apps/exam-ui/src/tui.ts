@@ -199,6 +199,31 @@ function createUI() {
     style: { fg: "yellow" },
   });
 
+  // Solutions box (hidden by default)
+  const solutionsBox = blessed.box({
+    parent: screen,
+    top: "center",
+    left: "center",
+    width: "80%",
+    height: "70%",
+    label: " Solution ",
+    content: "",
+    tags: true,
+    scrollable: true,
+    alwaysScroll: true,
+    keys: true,
+    mouse: true,
+    scrollbar: {
+      ch: "█",
+      style: { fg: "yellow" },
+    },
+    style: {
+      border: { fg: "yellow" },
+    },
+    border: { type: "line" },
+    hidden: true,
+  });
+
   // Help bar
   const helpBar = blessed.box({
     parent: screen,
@@ -207,7 +232,7 @@ function createUI() {
     width: "100%",
     height: 2,
     content:
-      "{cyan-fg}[↑/↓/j/k]{/} Navigate | {cyan-fg}[Enter]{/} Select | {cyan-fg}[f]{/} Flag | {cyan-fg}[a]{/} All | {cyan-fg}[F]{/} Flagged | {cyan-fg}[/]{/} Search | {cyan-fg}[q/Esc]{/} Quit",
+      "{cyan-fg}[↑/↓/j/k]{/} Navigate | {cyan-fg}[Enter]{/} Select | {cyan-fg}[f]{/} Flag | {cyan-fg}[s]{/} Solution | {cyan-fg}[/]{/} Search | {cyan-fg}[q/Esc]{/} Quit",
     tags: true,
     style: {
       border: { fg: "cyan" },
@@ -257,6 +282,64 @@ function createUI() {
     screen.render();
   }
 
+  // Highlight important terms in task content
+  function highlightContent(text: string): string {
+    // First, highlight backtick-wrapped terms with different colors based on type
+    text = text.replace(/`([^`]+)`/g, (match, name) => {
+      // Namespaces (magenta/bold)
+      if (name.match(/^(default|istio-system|bookinfo|payments|tonga|swagger|hello)$/i)) {
+        return `{magenta-fg}{bold}\`${name}\`{/bold}{/}`;
+      }
+      // Kubernetes resource types (cyan/bold)
+      if (name.match(/^(ServiceEntry|VirtualService|DestinationRule|Gateway|PeerAuthentication|AuthorizationPolicy|HTTPRoute|GatewayClass|Telemetry|Deployment|Service|Pod|Namespace)$/i)) {
+        return `{cyan-fg}{bold}\`${name}\`{/bold}{/}`;
+      }
+      // Resource names with dashes (green)
+      if (name.match(/[-_]/) || name.match(/^(httpbin|helloworld|payments|curl|istiod|istio-ingressgateway|prometheus|kiali|jaeger|app-local-se|app-local-vs|httpbin-gw|httpbin-vs|httpbin-kgw|httpbin-route|payments-dr|payments-vs|helloworld-match-vs|helloworld-cb|fakeservice-od|default-strict|httpbin-port-permissive|curl-to-httpbin-post-only|allow-nothing|mesh-default)$/i)) {
+        return `{green-fg}\`${name}\`{/}`;
+      }
+      // Port numbers in backticks
+      if (name.match(/^\d+$/)) {
+        return `{bright-yellow-fg}\`${name}\`{/}`;
+      }
+      // Default highlight for other backtick-wrapped terms (yellow)
+      return `{yellow-fg}\`${name}\`{/}`;
+    });
+
+    // Highlight standalone namespace mentions
+    text = text.replace(/\b(namespace|Namespace)\s+`?([a-z0-9-]+)`?/gi, (match, keyword, ns) => {
+      return `{white-fg}${keyword}{/} {magenta-fg}{bold}${ns || ''}{/bold}{/}`;
+    });
+
+    // Highlight commands (kubectl, istioctl, curl) - full line
+    text = text.replace(/^(kubectl|istioctl|curl)\s+([^\n]+)/gm, (match, cmd, args) => {
+      return `{bright-blue-fg}{bold}${cmd}{/bold}{/} {white-fg}${args}{/}`;
+    });
+
+    // Highlight "Test the endpoint" or similar instruction lines
+    text = text.replace(/^(Test|You can|Confirm|Verify|Run|Create|Apply|Update|Ensure|Deploy|Install|Label|Expose|Add|Inject|Configure)\b/gmi, (match) => {
+      return `{bright-cyan-fg}${match}{/}`;
+    });
+
+    // Highlight port numbers in context
+    text = text.replace(/\b(port|Port|on port)\s+(\d+)/gi, (match, keyword, port) => {
+      return `{white-fg}${keyword}{/} {bright-yellow-fg}${port}{/}`;
+    });
+
+    // Highlight percentages
+    text = text.replace(/\b(\d+)%/g, `{bright-yellow-fg}$1%{/}`);
+    
+    // Highlight time durations
+    text = text.replace(/\b(\d+[sm])\b/g, `{bright-yellow-fg}$1{/}`);
+
+    // Highlight hostnames/domains
+    text = text.replace(/\b([a-z0-9-]+\.(com|local|svc\.cluster\.local))\b/gi, (match) => {
+      return `{bright-green-fg}${match}{/}`;
+    });
+
+    return text;
+  }
+
   // Update task detail display
   function updateTaskDetail() {
     const filtered = getFilteredTasks();
@@ -274,37 +357,403 @@ function createUI() {
     }
 
     const isFlagged = flagged.has(task.id);
-    const flagStatus = isFlagged ? "{yellow-fg}★ FLAGGED{/}" : "";
+    const flagStatus = isFlagged ? " {yellow-fg}★ FLAGGED{/}" : "";
+    const taskNumber = String(task.id).padStart(2, '0');
     
-    // Format the task body with basic markdown-like rendering
-    const body = task.summary
-      .split("\n\n")
+    // Format the task body with enhanced highlighting
+    let body = task.summary;
+    
+    // Handle numbered steps
+    body = body.replace(/^(\d+\.)\s+/gm, `{cyan-fg}$1{/} `);
+    
+    // Handle bullet lists
+    body = body.split("\n\n")
       .map((para) => {
-        // Handle bullet lists
         if (para.match(/^[-*]\s+/m)) {
           return para
             .split("\n")
-            .map((line) => line.replace(/^[-*]\s+/, "  • "))
+            .map((line) => line.replace(/^[-*]\s+/, `  {yellow-fg}•{/} `))
             .join("\n");
         }
         return para;
       })
       .join("\n\n");
 
+    // Apply highlighting
+    body = highlightContent(body);
+
+    // Format content with task number at top
     const content = `
+{white-fg}{bold}Task ${taskNumber} ({bright-cyan-fg}${task.points ?? "?"} pts{/}){/bold}{/}${flagStatus}
 {cyan-fg}{bold}${task.subtitle}{/bold}{/}
-{gray-fg}${task.title} • ${task.points ?? "?"}pts{/} ${flagStatus}
 
 ${"─".repeat(60)}
 
-${body}
+{white-fg}${body}{/}
 
 ${"─".repeat(60)}
-{gray-fg}Press 'f' to ${isFlagged ? "unflag" : "flag"} this task{/}
+{gray-fg}Press 'f' to ${isFlagged ? "unflag" : "flag"} | Press 's' to view solution{/}
 `;
 
     taskDetail.setContent(content);
     taskDetail.setScrollPerc(0);
+    screen.render();
+  }
+
+  // Show solution for current task
+  function showSolution() {
+    const filtered = getFilteredTasks();
+    const task = filtered[currentIndex];
+    if (!task) return;
+
+    const taskId = typeof task.id === 'string' ? parseInt(task.id) : task.id;
+    const solutions: Record<number, string> = {
+      1: `{cyan-fg}{bold}Objective:{/bold}{/} Install Istio 1.26.x with demo profile
+
+{white-fg}Step 1: Install Istio with demo profile{/}
+{bright-blue-fg}istioctl install --set profile=demo -y{/}
+
+{white-fg}Explanation:{/} The demo profile includes:
+  • {green-fg}istiod{/} - Control plane
+  • {green-fg}istio-ingressgateway{/} - Ingress gateway
+  • All necessary components for testing
+
+{white-fg}Step 2: Wait for istiod to be ready{/}
+{bright-blue-fg}kubectl wait -n istio-system deploy/istiod --for=condition=Available --timeout=600s{/}
+
+{white-fg}Step 3: Wait for ingress gateway{/}
+{bright-blue-fg}kubectl wait -n istio-system deploy/istio-ingressgateway --for=condition=Available --timeout=600s{/}
+
+{white-fg}Step 4: Verify installation{/}
+{bright-blue-fg}istioctl version{/}
+{bright-blue-fg}kubectl get deploy -n istio-system{/}
+
+{white-fg}Expected output:{/} Both deployments show AVAILABLE=1`,
+
+      2: `{cyan-fg}{bold}Objective:{/bold}{/} Enable automatic sidecar injection for default namespace
+
+{white-fg}Step 1: Label namespace for injection{/}
+{bright-blue-fg}kubectl label ns default istio-injection=enabled --overwrite{/}
+
+{white-fg}Explanation:{/} This label tells Istio to automatically inject
+the {green-fg}istio-proxy{/} sidecar into all pods in this namespace.
+
+{white-fg}Step 2: Restart existing deployments{/}
+{bright-blue-fg}kubectl -n default rollout restart deploy{/}
+
+{white-fg}Explanation:{/} Existing pods need to be recreated to get
+the sidecar injected.
+
+{white-fg}Step 3: Verify sidecar injection{/}
+{bright-blue-fg}kubectl get pods -n default{/}
+{bright-blue-fg}kubectl describe pod <pod-name> -n default{/}
+
+{white-fg}Expected:{/} Pods should show 2/2 containers (app + istio-proxy)`,
+
+      3: `{cyan-fg}{bold}Objective:{/bold}{/} Route external traffic to httpbin service via Istio Gateway
+
+{white-fg}Step 1: Apply Gateway and VirtualService{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-03-12.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}Gateway httpbin-gw{/bold}{/} - Listens on port 80 for host {bright-green-fg}httpbin.com{/}
+  • {cyan-fg}{bold}VirtualService httpbin-vs{/bold}{/} - Routes traffic to {green-fg}httpbin.default.svc.cluster.local:8000{/}
+
+{white-fg}Step 2: Verify resources created{/}
+{bright-blue-fg}kubectl get gateway -n default{/}
+{bright-blue-fg}kubectl get virtualservice -n default{/}
+
+{white-fg}Step 3: Test the endpoint{/}
+{bright-blue-fg}kubectl exec -n default deploy/curl -- curl -H "Host: httpbin.com" http://istio-ingressgateway.istio-system.svc.cluster.local{/}
+
+{white-fg}Key concepts:{/}
+  • Gateway defines entry point (ingress gateway)
+  • VirtualService defines routing rules
+  • Host header must match for routing to work`,
+
+      4: `{cyan-fg}{bold}Objective:{/bold}{/} Expose httpbin using Kubernetes Gateway API
+
+{white-fg}Step 1: Apply Gateway API resources{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-03-12.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}GatewayClass istio{/bold}{/} - Defines Istio as the controller
+  • {cyan-fg}{bold}Gateway httpbin-kgw{/bold}{/} - Kubernetes Gateway resource
+  • {cyan-fg}{bold}HTTPRoute httpbin-route{/bold}{/} - Routes to httpbin service on port 8000
+
+{white-fg}Step 2: Verify Gateway API resources{/}
+{bright-blue-fg}kubectl get gatewayclass{/}
+{bright-blue-fg}kubectl get gateway -n default{/}
+{bright-blue-fg}kubectl get httproute -n default{/}
+
+{white-fg}Key difference:{/} Gateway API is Kubernetes-native, while
+Istio Gateway is Istio-specific. Both achieve similar results.`,
+
+      5: `{cyan-fg}{bold}Objective:{/bold}{/} Split traffic 70% to v1, 30% to v2 in payments namespace
+
+{white-fg}Step 1: Apply DestinationRule and VirtualService{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-03-12.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}DestinationRule payments-dr{/bold}{/} - Defines subsets v1 and v2 based on labels
+  • {cyan-fg}{bold}VirtualService payments-vs{/bold}{/} - Routes 70% to subset v1, 30% to subset v2
+
+{white-fg}Step 2: Verify traffic splitting{/}
+{bright-blue-fg}kubectl get destinationrule -n payments{/}
+{bright-blue-fg}kubectl get virtualservice -n payments{/}
+
+{white-fg}Step 3: Test weighted routing{/}
+{bright-blue-fg}for i in {1..10}; do kubectl exec -n payments deploy/curl -- curl -s payments/version; done{/}
+
+{white-fg}Expected:{/} ~70% should show v1, ~30% should show v2`,
+
+      6: `{cyan-fg}{bold}Objective:{/bold}{/} Route /v1 and /v2 to different subsets with URL rewrites
+
+{white-fg}Step 1: Apply VirtualService{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-03-12.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}VirtualService helloworld-match-vs{/bold}{/} with:
+    - /v1 → rewrites to /hello, routes to subset v1
+    - /v2 → rewrites to /hello, routes to subset v2
+    - All other paths → fallback to subset v1
+
+{white-fg}Step 2: Test routing{/}
+{bright-blue-fg}kubectl exec -n default deploy/curl -- curl helloworld/v1{/}
+{bright-blue-fg}kubectl exec -n default deploy/curl -- curl helloworld/v2{/}
+{bright-blue-fg}kubectl exec -n default deploy/curl -- curl helloworld/other{/}
+
+{white-fg}Key concept:{/} URL rewrite changes the path before forwarding to backend`,
+
+      7: `{cyan-fg}{bold}Objective:{/bold}{/} Add timeout and retry logic to payments service
+
+{white-fg}Step 1: Apply updated VirtualService{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-03-12.yaml{/}
+
+{white-fg}What this updates:{/}
+  • {cyan-fg}{bold}VirtualService payments-vs{/bold}{/} now includes:
+    - timeout: 2s (request timeout)
+    - retries: 3 attempts
+    - perTryTimeout: 1s (timeout per retry)
+    - retryOn: 5xx,connect-failure,refused-stream
+
+{white-fg}Step 2: Verify configuration{/}
+{bright-blue-fg}kubectl get virtualservice payments-vs -n payments -o yaml{/}
+
+{white-fg}Key concepts:{/}
+  • Timeout: Max time to wait for response
+  • Retries: Number of retry attempts
+  • perTryTimeout: Timeout for each retry attempt`,
+
+      8: `{cyan-fg}{bold}Objective:{/bold}{/} Inject 2s delay on 20% of /v2 traffic
+
+{white-fg}Step 1: Apply VirtualService with fault injection{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-03-12.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}VirtualService helloworld-fault-vs{/bold}{/} with:
+    - fault.delay.fixedDelay: 2s
+    - fault.delay.percentage.value: 20
+    - Applied only to /v2 route
+
+{white-fg}Step 2: Test fault injection{/}
+{bright-blue-fg}time kubectl exec -n default deploy/curl -- curl helloworld/v2{/}
+
+{white-fg}Expected:{/} ~20% of requests to /v2 will take 2+ seconds longer
+
+{white-fg}Key concept:{/} Fault injection helps test resilience`,
+
+      9: `{cyan-fg}{bold}Objective:{/bold}{/} Configure circuit breaker for helloworld service
+
+{white-fg}Step 1: Apply DestinationRule with circuit breaker{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-03-12.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}DestinationRule helloworld-cb{/bold}{/} with connection pool limits:
+    - http1MaxPendingRequests: 1
+    - http2MaxRequests: 1
+    - maxRequestsPerConnection: 1
+
+{white-fg}Step 2: Verify configuration{/}
+{bright-blue-fg}kubectl get destinationrule helloworld-cb -n default -o yaml{/}
+
+{white-fg}Explanation:{/} Circuit breaker prevents overload by limiting:
+  • Max pending HTTP/1.1 requests
+  • Max concurrent HTTP/2 requests
+  • Max requests per connection
+
+{white-fg}Key concept:{/} Circuit breaker protects backend from overload`,
+
+      10: `{cyan-fg}{bold}Objective:{/bold}{/} Configure outlier detection for fakeservice
+
+{white-fg}Step 1: Apply DestinationRule{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-03-12.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}DestinationRule fakeservice-od{/bold}{/} with outlier detection:
+    - consecutive5xxErrors: 1 (eject after 1 error)
+    - interval: 5s (check every 5 seconds)
+    - baseEjectionTime: 3m (eject for 3 minutes)
+    - maxEjectionPercent: 100 (allow 100% ejection)
+
+{white-fg}Step 2: Verify configuration{/}
+{bright-blue-fg}kubectl get destinationrule fakeservice-od -n default -o yaml{/}
+
+{white-fg}Key concept:{/} Outlier detection removes unhealthy endpoints`,
+
+      11: `{cyan-fg}{bold}Objective:{/bold}{/} Deploy Prometheus for metrics collection
+
+{white-fg}Step 1: Apply Prometheus deployment{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-11-16.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}Deployment prometheus{/bold}{/} in {magenta-fg}{bold}istio-system{/bold}{/} namespace
+
+{white-fg}Step 2: Verify Prometheus is running{/}
+{bright-blue-fg}kubectl get deploy prometheus -n istio-system{/}
+{bright-blue-fg}kubectl get pods -n istio-system -l app=prometheus{/}
+
+{white-fg}Step 3: Access Prometheus UI (if port-forward enabled){/}
+{bright-blue-fg}kubectl port-forward -n istio-system svc/prometheus 9090:9090{/}
+
+{white-fg}Key concept:{/} Prometheus scrapes metrics from Istio components`,
+
+      12: `{cyan-fg}{bold}Objective:{/bold}{/} Deploy Kiali and enable injection for bookinfo
+
+{white-fg}Step 1: Apply Kiali deployment{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-11-16.yaml{/}
+
+{white-fg}Step 2: Label bookinfo namespace for injection{/}
+{bright-blue-fg}kubectl label ns bookinfo istio-injection=enabled{/}
+
+{white-fg}Explanation:{/} This enables automatic sidecar injection
+for all pods in the {magenta-fg}{bold}bookinfo{/bold}{/} namespace.
+
+{white-fg}Step 3: Verify Kiali deployment{/}
+{bright-blue-fg}kubectl get deploy kiali -n istio-system{/}
+{bright-blue-fg}kubectl get pods -n istio-system -l app=kiali{/}
+
+{white-fg}Step 4: Verify namespace label{/}
+{bright-blue-fg}kubectl get ns bookinfo --show-labels{/}
+
+{white-fg}Key concept:{/} Kiali provides service mesh visualization`,
+
+      13: `{cyan-fg}{bold}Objective:{/bold}{/} Deploy Jaeger and configure 100% trace sampling
+
+{white-fg}Step 1: Apply Jaeger deployment{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-11-16.yaml{/}
+
+{white-fg}Step 2: Apply Telemetry resource for 100% sampling{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-13-16.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}Deployment jaeger{/bold}{/} in {magenta-fg}{bold}istio-system{/bold}{/}
+  • {cyan-fg}{bold}Telemetry mesh-default{/bold}{/} with randomSamplingPercentage: 100
+
+{white-fg}Step 3: Verify Jaeger{/}
+{bright-blue-fg}kubectl get deploy jaeger -n istio-system{/}
+{bright-blue-fg}kubectl get telemetry -n istio-system{/}
+
+{white-fg}Step 4: Verify sampling{/}
+{bright-blue-fg}kubectl get telemetry mesh-default -n istio-system -o yaml{/}
+
+{white-fg}Key concept:{/} 100% sampling captures all traces (use carefully in production)`,
+
+      14: `{cyan-fg}{bold}Objective:{/bold}{/} Enforce STRICT mTLS with port-level override
+
+{white-fg}Step 1: Apply PeerAuthentication resources{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-13-16.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}PeerAuthentication default-strict{/bold}{/}:
+    - Enforces STRICT mTLS for all pods in {magenta-fg}{bold}default{/bold}{/} namespace
+  • {cyan-fg}{bold}PeerAuthentication httpbin-port-permissive{/bold}{/}:
+    - Selector matches {green-fg}app: httpbin{/}
+    - Port 8000 allows PERMISSIVE mode (non-mTLS allowed)
+
+{white-fg}Step 2: Verify PeerAuthentication{/}
+{bright-blue-fg}kubectl get peerauthentication -n default{/}
+{bright-blue-fg}kubectl get peerauthentication default-strict -n default -o yaml{/}
+{bright-blue-fg}kubectl get peerauthentication httpbin-port-permissive -n default -o yaml{/}
+
+{white-fg}Key concepts:{/}
+  • STRICT: Only mTLS traffic allowed
+  • PERMISSIVE: Both mTLS and plain text allowed
+  • Port-level override: More specific policy wins`,
+
+      15: `{cyan-fg}{bold}Objective:{/bold}{/} Deny all by default, allow only curl SA POST to httpbin
+
+{white-fg}Step 1: Apply AuthorizationPolicy resources{/}
+{bright-blue-fg}kubectl apply -f /vagrant/manifests/task-13-16.yaml{/}
+
+{white-fg}What this creates:{/}
+  • {cyan-fg}{bold}AuthorizationPolicy allow-nothing{/bold}{/}:
+    - Empty spec = deny all traffic by default
+  • {cyan-fg}{bold}AuthorizationPolicy curl-to-httpbin-post-only{/bold}{/}:
+    - Selector: {green-fg}app: httpbin{/}
+    - Action: ALLOW
+    - Source: {green-fg}cluster.local/ns/default/sa/curl{/}
+    - Method: POST only
+
+{white-fg}Step 2: Verify policies{/}
+{bright-blue-fg}kubectl get authorizationpolicy -n default{/}
+{bright-blue-fg}kubectl get authorizationpolicy curl-to-httpbin-post-only -n default -o yaml{/}
+
+{white-fg}Step 3: Test authorization{/}
+{bright-blue-fg}# This should work (POST from curl SA){/}
+{bright-blue-fg}kubectl exec -n default deploy/curl -- curl -X POST httpbin/post{/}
+{bright-blue-fg}# This should fail (GET not allowed){/}
+{bright-blue-fg}kubectl exec -n default deploy/curl -- curl httpbin/get{/}
+
+{white-fg}Key concept:{/} AuthorizationPolicy controls who can do what`,
+
+      16: `{cyan-fg}{bold}Objective:{/bold}{/} Create revision tag and apply to swagger namespace
+
+{white-fg}Step 1: Create revision tag{/}
+{bright-blue-fg}istioctl tag set latest --revision default --overwrite{/}
+
+{white-fg}Explanation:{/} Creates a tag "latest" pointing to the
+"default" Istio revision. Tags are aliases for revisions.
+
+{white-fg}Step 2: Label swagger namespace to use the tag{/}
+{bright-blue-fg}kubectl label ns swagger istio.io/rev=latest --overwrite{/}
+
+{white-fg}Explanation:{/} This tells Istio to inject sidecars from
+the "latest" revision (which points to "default").
+
+{white-fg}Step 3: Verify tag exists{/}
+{bright-blue-fg}istioctl tag list{/}
+
+{white-fg}Step 4: Verify namespace label{/}
+{bright-blue-fg}kubectl get ns swagger --show-labels{/}
+
+{white-fg}Step 5: Restart pods to get new sidecars{/}
+{bright-blue-fg}kubectl rollout restart deploy -n swagger{/}
+
+{white-fg}Key concepts:{/}
+  • Revision: Specific Istio control plane version
+  • Tag: Alias/pointer to a revision
+  • istio.io/rev label: Tells which revision to use for injection`
+    };
+
+    const solution = solutions[taskId] || "No solution available for this task.";
+    
+    solutionsBox.setContent(
+      `${solution}\n\n` +
+      `{gray-fg}─${"─".repeat(58)}─{/}\n\n` +
+      `{yellow-fg}How to copy commands:{/}\n` +
+      `{white-fg}1. Use tmux copy mode: Ctrl+b then [\n` +
+      `2. Navigate with arrow keys\n` +
+      `3. Press Space to start selection\n` +
+      `4. Move to end and press Enter to copy\n` +
+      `5. Paste with Ctrl+b then ]{/}\n\n` +
+      `{yellow-fg}Or view in file:{/}\n` +
+      `{white-fg}cat /vagrant/TASK-SOLUTIONS.txt{/}\n\n` +
+      `{gray-fg}Press 'Esc' or 'q' to close | Use arrow keys to scroll{/}`
+    );
+    solutionsBox.setScrollPerc(0);
+    solutionsBox.show();
+    solutionsBox.focus();
     screen.render();
   }
 
@@ -339,7 +788,7 @@ ${"─".repeat(60)}
   }
 
   // Event handlers
-  taskList.on("select", (item, index) => {
+  taskList.on("select", (item: any, index: number) => {
     currentIndex = index;
     updateTaskDetail();
   });
@@ -349,14 +798,30 @@ ${"─".repeat(60)}
   });
 
   screen.key(["f"], () => {
-    toggleFlag();
+    if (solutionsBox.hidden) {
+      toggleFlag();
+    }
+  });
+
+  screen.key(["s"], () => {
+    if (solutionsBox.hidden) {
+      showSolution();
+    }
+  });
+
+  solutionsBox.key(["escape", "q"], () => {
+    solutionsBox.hide();
+    taskList.focus();
+    screen.render();
   });
 
   screen.key(["a"], () => {
-    filterMode = "all";
-    currentIndex = 0;
-    updateTaskList();
-    updateTaskDetail();
+    if (solutionsBox.hidden) {
+      filterMode = "all";
+      currentIndex = 0;
+      updateTaskList();
+      updateTaskDetail();
+    }
   });
 
   screen.key(["S-f"], () => {
@@ -391,15 +856,20 @@ ${"─".repeat(60)}
 
   // Navigate with vim keys
   screen.key(["j", "down"], () => {
-    taskList.down();
-    currentIndex = taskList.selected;
-    updateTaskDetail();
+    const filtered = getFilteredTasks();
+    if (currentIndex < filtered.length - 1) {
+      currentIndex++;
+      taskList.select(currentIndex);
+      updateTaskDetail();
+    }
   });
 
   screen.key(["k", "up"], () => {
-    taskList.up();
-    currentIndex = taskList.selected;
-    updateTaskDetail();
+    if (currentIndex > 0) {
+      currentIndex--;
+      taskList.select(currentIndex);
+      updateTaskDetail();
+    }
   });
 
   // Scroll detail pane

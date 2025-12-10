@@ -68,7 +68,23 @@ Mock exam quick start:
    - Re-running `vagrant provision controlplane` is quick: the bootstrap scripts detect an already-initialized cluster and skip the expensive `kubeadm init`/`kubeadm join` steps, so you can refresh Istio + the lab workloads without tearing down the VMs.
    - Istio and all lab workloads are installed from the controlplane by `scripts/istio-ica-lab.sh` once the worker joins; node02 is only a client VM for running kubectl/istioctl, not for installing Istio.
    - SSH tips: use the default `vagrant` user for worker/client VMs (`vagrant ssh node01`, `vagrant ssh node02`); root SSH will prompt for a password unless you set one.
-2. Optional TUI helper: `sudo /vagrant/scripts/exam-env.sh` (left pane shows the live task list, the top-right pane is your shell, and the bottom-right pane auto-refreshes the scoreboard via `/vagrant/check-exam.sh`; detach with `Ctrl-b d` and reconnect with `tmux attach -t exam`)
+
+2. **Start the exam TUI** (choose one method):
+
+   **Option A: Quick-start script (recommended)**
+   ```bash
+   ./start-exam.sh          # Linux/Mac/WSL
+   # OR
+   .\start-exam.ps1         # Windows PowerShell
+   ```
+   This single command handles SSH and TUI launch automatically.
+
+   **Option B: Manual steps**
+   ```bash
+   vagrant ssh controlplane
+   sudo /vagrant/scripts/exam-tui-bun.sh
+   ```
+
 3. Read the full prompts in `/vagrant/exam-tasks.md` (rendered automatically in the helper)
 4. Run `sudo /vagrant/check-exam.sh` (no args = all tasks, or pass numbers like `5 6 7`)
 5. Use the scoreboard summary plus [`docs/mock-exam.md`](docs/mock-exam.md) for remediation tips.

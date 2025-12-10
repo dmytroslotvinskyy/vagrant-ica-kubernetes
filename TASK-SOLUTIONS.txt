@@ -1,0 +1,30 @@
+# Task Solutions - Copy-Paste Ready Commands
+
+## Task 1: Install Istio 1.26 Demo Profile (7pts)
+istioctl install --set profile=demo -y
+kubectl wait -n istio-system deploy/istiod --for=condition=Available --timeout=600s
+kubectl wait -n istio-system deploy/istio-ingressgateway --for=condition=Available --timeout=600s
+
+## Task 2: Default ns injection + samples (5pts)
+kubectl label ns default istio-injection=enabled --overwrite
+kubectl -n default rollout restart deploy
+
+## Tasks 3-10: Traffic Management (50pts)
+kubectl apply -f /vagrant/manifests/task-03-12.yaml
+
+## Tasks 11-13: Observability (13pts)
+kubectl apply -f /vagrant/manifests/task-11-16.yaml
+kubectl label ns bookinfo istio-injection=enabled
+kubectl apply -f /vagrant/manifests/task-13-16.yaml
+
+## Tasks 14-15: Security (14pts)
+kubectl apply -f /vagrant/manifests/task-13-16.yaml
+
+## Task 16: Revision tag latest + swagger (9pts)
+istioctl tag set latest --revision default --overwrite
+kubectl label ns swagger istio.io/rev=latest --overwrite
+
+## Verification
+/vagrant/check-exam.sh all
+/vagrant/check-exam.sh -s all
+
