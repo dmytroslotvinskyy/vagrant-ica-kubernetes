@@ -55,7 +55,8 @@ wait_for_api() {
   local delay="${API_DELAY:-3}"
   local i
   for i in $(seq 1 "$retries"); do
-    if kubectl version --client --output=yaml >/dev/null 2>&1; then
+    # Use server version check (actually contacts API) instead of --client
+    if kubectl version --output=yaml >/dev/null 2>&1; then
       return 0
     fi
     echo "[verify-lab] API not reachable yet (attempt ${i}/${retries}); sleeping ${delay}s..."

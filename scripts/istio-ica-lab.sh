@@ -98,9 +98,21 @@ install_istioctl() {
 }
 
 install_istio_control_plane() {
+  # Check if Istio is already successfully installed (not just namespace exists)
   if kubectl get ns istio-system >/dev/null 2>&1; then
-    echo "[istio-ica-lab] Re-run detected; Istio control plane already installed. Refreshing workloads and checks only."
-    return
+    # Verify it's actually healthy, not just partially installed
+    if kubectl get deploy -n istio-system istiod >/dev/null 2>&1 && \
+       kubectl get deploy -n istio-system istio-ingressgateway >/dev/null 2>&1; then
+      local istiod_ready=$(kubectl get deploy -n istio-system istiod -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
+      if [ "$istiod_ready" -ge 1 ]; then
+        echo "[istio-ica-lab] Istio control plane already healthy. Skipping install."
+        return 0
+      fi
+    fi
+    echo "[istio-ica-lab] WARNING: istio-system namespace exists but Istio appears incomplete."
+    echo "[istio-ica-lab] Current state:"
+    kubectl get pods -n istio-system 2>/dev/null || true
+    echo "[istio-ica-lab] Will attempt to repair/reinstall..."
   fi
 
   wait_for_cluster_nodes
@@ -108,15 +120,57 @@ install_istio_control_plane() {
   echo "[istio-ica-lab] Installing Istio control plane (demo profile)"
   local attempts=0
   local max_attempts=3
-  until istioctl install --set profile=demo -y; do
+  local install_output
+  local install_exit_code
+  
+  until istioctl install --set profile=demo -y 2>&1 | tee /tmp/istio-install.log; do
+    install_exit_code=$?
     attempts=$((attempts + 1))
+    
+    echo ""
+    echo "[istio-ica-lab] Istio install attempt ${attempts}/${max_attempts} failed (exit code: ${install_exit_code})"
+    echo "[istio-ica-lab] Diagnosing failure..."
+    
+    # Show current state
+    if kubectl get ns istio-system >/dev/null 2>&1; then
+      echo "[istio-ica-lab] Pods in istio-system:"
+      kubectl get pods -n istio-system -o wide 2>/dev/null || true
+      
+      # Check for common issues
+      if kubectl get pods -n istio-system 2>/dev/null | grep -E 'ImagePullBackOff|ErrImagePull' >/dev/null; then
+        echo "[istio-ica-lab] DETECTED: Image pull failures. Check network connectivity and image availability."
+      fi
+      if kubectl get pods -n istio-system 2>/dev/null | grep -E 'Pending' >/dev/null; then
+        echo "[istio-ica-lab] DETECTED: Pending pods. Checking node resources..."
+        kubectl describe nodes | grep -A 5 "Allocated resources" || true
+      fi
+      if kubectl get pods -n istio-system 2>/dev/null | grep -E 'CrashLoopBackOff' >/dev/null; then
+        echo "[istio-ica-lab] DETECTED: Crash loops. Recent logs from istiod:"
+        kubectl logs -n istio-system -l app=istiod --tail=20 2>/dev/null || true
+      fi
+    fi
+    
     if [ "$attempts" -ge "$max_attempts" ]; then
-      echo "[istio-ica-lab] Failed to install Istio after ${attempts} attempts"
+      echo ""
+      echo "[istio-ica-lab] ❌ Failed to install Istio after ${max_attempts} attempts"
+      echo "[istio-ica-lab] "
+      echo "[istio-ica-lab] RECOVERY OPTIONS:"
+      echo "[istio-ica-lab] 1. Check pods:         kubectl get pods -n istio-system"
+      echo "[istio-ica-lab] 2. Clean up and retry: kubectl delete ns istio-system"
+      echo "[istio-ica-lab]                        # Wait for namespace deletion to complete"
+      echo "[istio-ica-lab]                        sudo /vagrant/scripts/istio-ica-lab.sh"
+      echo "[istio-ica-lab] 3. Check node resources: kubectl describe nodes"
+      echo "[istio-ica-lab] 4. Review install log: cat /tmp/istio-install.log"
+      echo ""
       return 1
     fi
+    
     echo "[istio-ica-lab] Retry Istio install (${attempts}/${max_attempts}) in 30s..."
     sleep 30
   done
+  
+  echo "[istio-ica-lab] ✓ Istio control plane installed successfully"
+  return 0
 }
 
 prepare_namespaces() {
