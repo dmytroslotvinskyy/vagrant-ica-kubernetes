@@ -12,10 +12,15 @@ if [ ! -x "$ISTIO_SCRIPT" ]; then
   exit 1
 fi
 
-echo "[lab-up] Running Istio + lab installer..."
+echo "[lab-up] Phase 1: Istio + lab workloads"
 sudo bash "$ISTIO_SCRIPT"
 
 echo "[lab-up] Lab payload applied."
+if [ -x /vagrant/scripts/verify-lab.sh ]; then
+  echo "[lab-up] Phase 2: Sanity check (verify-lab.sh)"
+  /vagrant/scripts/verify-lab.sh || echo "[lab-up] verify-lab detected issues; review output above."
+fi
+
 echo "[lab-up] Next steps:"
 echo "  vagrant ssh controlplane"
 echo "  sudo /vagrant/scripts/exam-tui-bun.sh"

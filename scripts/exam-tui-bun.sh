@@ -13,6 +13,12 @@ export PATH="${BUN_INSTALL_DIR}/bin:${PATH}"
 
 source /vagrant/scripts/tui-common.sh
 
+if ! kubectl get ns istio-system >/dev/null 2>&1; then
+  echo "[exam-tui] istio-system namespace not found. Run lab bring-up first:"
+  echo "  sudo /vagrant/scripts/lab-up.sh"
+  exit 1
+fi
+
 launch_tmux_env() {
   if [ ! -x "$EXAM_ENV_SCRIPT" ]; then
     echo "[exam-tui-bun] ERROR: $EXAM_ENV_SCRIPT is missing or not executable." >&2

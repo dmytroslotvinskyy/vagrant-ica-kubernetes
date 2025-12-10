@@ -4,6 +4,7 @@ vagrant_root = File.dirname(File.expand_path(__FILE__))
 settings = YAML.load_file "#{vagrant_root}/settings.yaml"
 MIN_MEMORY_MB = 2048
 EXAM_MODE = settings["exam_mode"] != false
+puts "[VAGRANT] exam_mode=#{EXAM_MODE ? 'true' : 'false'}"
 
 IP_SECTIONS = settings["network"]["control_ip"].match(/^([0-9.]+\.)([^.]+)$/)
 # First 3 octets including the trailing dot:
@@ -96,9 +97,13 @@ Vagrant.configure("2") do |config|
     # after Istio is installed so pods get sidecars automatically.
     if EXAM_MODE
       controlplane.vm.provision "shell", run: "always", inline: <<-SHELL
-        echo "[exam-env] To start the exam UI, run:"
-        echo "  sudo /vagrant/scripts/exam-tui-bun.sh"
-        echo "(or use /vagrant/scripts/exam-env.sh for the legacy bash viewer)"
+        echo "[exam-env] exam_mode=true → ICA lab enabled."
+        echo "           To start the exam UI: sudo /vagrant/scripts/exam-tui-bun.sh"
+        echo "           Legacy: /vagrant/scripts/exam-env.sh (bash viewer)"
+      SHELL
+    else
+      controlplane.vm.provision "shell", run: "always", inline: <<-SHELL
+        echo "[exam-env] exam_mode=false → Skipping Istio/ICA lab payload."
       SHELL
     end
     controlplane.vm.provision "shell",
