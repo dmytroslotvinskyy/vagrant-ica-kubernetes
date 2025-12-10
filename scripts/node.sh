@@ -61,12 +61,17 @@ while true; do
 done
 
 sudo -i -u vagrant bash << EOF
+set +u
 whoami
 mkdir -p /home/vagrant/.kube
 sudo cp -i "$config_path/config" /home/vagrant/.kube/
 sudo chown 1000:1000 /home/vagrant/.kube/config
-NODENAME=$(hostname -s)
-kubectl label node "$NODENAME" node-role.kubernetes.io/worker=worker
+NODENAME=\$(hostname -s)
+if [ -z "\$NODENAME" ]; then
+  echo "[node] Warning: hostname -s returned empty, using default"
+  NODENAME=\$(hostname || echo "unknown")
+fi
+kubectl label node "\$NODENAME" node-role.kubernetes.io/worker=worker || true
 echo "[node] kubeadm join succeeded on attempt ${attempt}"
 kubectl get nodes -o wide | sed 's/^/[node] /'
 EOF
