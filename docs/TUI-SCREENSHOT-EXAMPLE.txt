@@ -1,0 +1,149 @@
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 ICA Istio Lab - Task Navigator                                      │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+┌─ Tasks ──────────────────────┬─ Task Details ──────────────────────────────────────────────────────┐
+│                               │                                                                     │
+│ ★ Task 1 (7pts)              │ Task 03 (9 pts)              ★ FLAGGED                             │
+│    Install Istio 1.26 demo   │ Istio Gateway + VirtualService                                      │
+│                               │                                                                     │
+│   Task 2 (5pts)              │ ────────────────────────────────────────────────────────            │
+│    Enable default namespace  │                                                                     │
+│                               │ Create (or update) `httpbin-gw` and `httpbin-vs` in                │
+│ ★ Task 3 (9pts)              │ namespace default so that traffic for host httpbin.com              │
+│    Istio Gateway + Virtual   │ via the Istio ingress gateway routes to                             │
+│                               │ httpbin.default.svc.cluster.local:8000.                             │
+│   Task 4 (6pts)              │                                                                     │
+│    Gateway API HTTPRoute     │ Test the endpoint:                                                  │
+│                               │                                                                     │
+│   Task 5 (9pts)              │ 1. Create the Gateway resource:                                     │
+│    Payments weighted routing │                                                                     │
+│                               │ kubectl apply -f - <<EOF                                            │
+│   Task 6 (7pts)              │ apiVersion: networking.istio.io/v1beta1                             │
+│    Header-based routing      │ kind: Gateway                                                       │
+│                               │ metadata:                                                           │
+│   Task 7 (5pts)              │   name: httpbin-gw                                                  │
+│    Timeout and retries       │   namespace: default                                                │
+│                               │ spec:                                                               │
+│   Task 8 (4pts)              │   selector:                                                         │
+│    Fault injection delay     │     istio: ingressgateway                                           │
+│                               │   servers:                                                          │
+│   Task 9 (6pts)              │   - port:                                                           │
+│    Circuit breaking policy   │       number: 80                                                    │
+│                               │       name: http                                                    │
+│   Task 10 (6pts)             │       protocol: HTTP                                                │
+│    Outlier detection         │     hosts:                                                          │
+│                               │     - httpbin.com                                                   │
+│   Task 11 (4pts)             │ EOF                                                                 │
+│    Prometheus addon          │                                                                     │
+│                               │ 2. Verify the Gateway:                                              │
+│   Task 12 (5pts)             │                                                                     │
+│    Kiali + namespace labels  │ kubectl get gateway -n default                                      │
+│                               │ kubectl describe gateway httpbin-gw -n default                      │
+│   Task 13 (4pts)             │                                                                     │
+│    Tracing and telemetry     │ 3. Test from the curl pod:                                          │
+│                               │                                                                     │
+│   Task 14 (7pts)             │ kubectl exec -n default deploy/curl -- curl -H \                    │
+│    PeerAuthentication strict │   "Host: httpbin.com" \                                             │
+│                               │   http://istio-ingressgateway.istio-system.svc.cluster.local        │
+│   Task 15 (7pts)             │                                                                     │
+│    AuthorizationPolicy POST  │ ────────────────────────────────────────────────────────            │
+│                               │ Press 'f' to unflag | Press 's' for solution                        │
+│   Task 16 (9pts)             │ 💡 Copy: Shift+Mouse or Ctrl+b [ then v(select) y(copy)            │
+│    Revision tag rollout      │                                                                     │
+│                               │                                                                     │
+└───────────────────────────────┴─────────────────────────────────────────────────────────────────────┘
+Task 03 (3/16) | Mode: All | Total: 16 | Flagged: 2
+
+┌─────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ [↑/↓/j/k] Navigate | [Enter] Select | [f] Flag | [F] Filter | [s] Solution | [/] Search | [q/Esc] │
+└─────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+════════════════════════════════════════════════════════════════════════════════════════════════════
+COLOR GUIDE (when rendered in actual TUI):
+════════════════════════════════════════════════════════════════════════════════════════════════════
+
+★                           → Yellow star (flagged indicator)
+Task 03                     → White bold
+(9 pts)                     → Bright cyan
+★ FLAGGED                   → Yellow
+
+`httpbin-gw`                → Green (resource names with dashes)
+`httpbin-vs`                → Green
+`default`                   → Magenta bold (namespaces)
+`httpbin.com`               → Bright green (hostnames)
+`8000`                      → Bright yellow (port numbers)
+`Gateway`                   → Cyan bold (K8s resource types)
+`VirtualService`            → Cyan bold
+
+kubectl                     → Bright blue bold (commands)
+curl                        → Bright blue bold
+-n default                  → White (command args)
+deploy/curl                 → White (resource references)
+
+1. Create...                → Cyan (numbered steps)
+Test the endpoint:          → Cyan (instruction keywords)
+
+💡 Copy hint                → Gray with yellow highlights
+
+
+════════════════════════════════════════════════════════════════════════════════════════════════════
+COPY EXAMPLES:
+════════════════════════════════════════════════════════════════════════════════════════════════════
+
+Example 1: Copy a single command
+┌────────────────────────────────────────────────────────────────────┐
+│ 1. Hold Shift                                                      │
+│ 2. Click before "kubectl" and drag to end of line                 │
+│ 3. Release mouse                                                   │
+│ ✓ Copied: kubectl get gateway -n default                          │
+└────────────────────────────────────────────────────────────────────┘
+
+Example 2: Copy multi-line kubectl apply
+┌────────────────────────────────────────────────────────────────────┐
+│ 1. Press Ctrl+b then [                                             │
+│ 2. Navigate to "kubectl apply -f - <<EOF"                         │
+│ 3. Press 'v' to start selection                                    │
+│ 4. Press 'j' to move down and select entire YAML block            │
+│ 5. Press 'y' to yank (copy)                                        │
+│ ✓ Copied to clipboard - paste with Ctrl+V anywhere                │
+└────────────────────────────────────────────────────────────────────┘
+
+Example 3: Copy just a resource name
+┌────────────────────────────────────────────────────────────────────┐
+│ 1. Shift+Mouse select just: httpbin-gw                            │
+│ ✓ Copied: httpbin-gw (without backticks)                          │
+└────────────────────────────────────────────────────────────────────┘
+
+Example 4: Copy namespace name
+┌────────────────────────────────────────────────────────────────────┐
+│ 1. Shift+Mouse select: default                                    │
+│ ✓ Copied: default                                                 │
+└────────────────────────────────────────────────────────────────────┘
+
+
+════════════════════════════════════════════════════════════════════════════════════════════════════
+ACTUAL TUI WORKFLOW:
+════════════════════════════════════════════════════════════════════════════════════════════════════
+
+Terminal 1 (Left Pane - F1):    Terminal 2 (Top Right - F2):    Terminal 3 (Bottom Right - F3):
+┌─────────────────────────┐    ┌──────────────────────────┐    ┌─────────────────────────────┐
+│ Tasks Navigator         │    │ Work Terminal            │    │ Verification Scoreboard     │
+│ - Browse tasks          │    │ - Run kubectl commands   │    │                             │
+│ - Flag questions        │    │ - Apply manifests        │    │ ✓ Task 01: PASS (7/7 pts)  │
+│ - View solutions        │    │ - Test endpoints         │    │ ✗ Task 03: FAIL (0/9 pts)  │
+│ - Search                │    │                          │    │ ⊗ Task 04: NOT RUN         │
+│                         │    │ vagrant@controlplane:~$  │    │                             │
+│ [Copy from here]        │    │ kubectl get gateway      │    │ Total: 7/100 pts           │
+│                         │    │ [Paste here] ────────►   │    │                             │
+└─────────────────────────┘    └──────────────────────────┘    └─────────────────────────────┘
+
+WORKFLOW:
+1. Read task in F1 pane
+2. Copy kubectl command with Shift+Mouse
+3. Press F2 to switch to work terminal
+4. Paste with Ctrl+V or Ctrl+Shift+V
+5. Run command
+6. Press F3 to check verification status
+7. Press F1 to go back to tasks
+

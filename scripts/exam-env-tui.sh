@@ -36,12 +36,39 @@ tmux select-pane -t "${SESSION_NAME}:0.1"
 # one-key scoreboard restart (F5) if the checker crashed or you updated tasks.
 tmux set-option -t "$SESSION_NAME" mouse on
 tmux set-option -t "$SESSION_NAME" status-left "[exam-tui] #{session_name}"
-tmux set-option -t "$SESSION_NAME" status-right "F1 tasks | F2 shell | F3 score | F5 restart"
+tmux set-option -t "$SESSION_NAME" status-right "F1 tasks | F2 shell | F3 score | F5 restart | Shift+Mouse=copy"
+
+# Vi-style copy mode for easier text selection
+tmux set-window-option -t "$SESSION_NAME" mode-keys vi
+tmux bind-key -T copy-mode-vi v send-keys -X begin-selection
+tmux bind-key -T copy-mode-vi y send-keys -X copy-selection-and-cancel
+tmux bind-key -T copy-mode-vi C-v send-keys -X rectangle-toggle
+
+# Quick copy to system clipboard if available (xclip/xsel/pbcopy)
+if command -v xclip >/dev/null 2>&1; then
+  tmux bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "xclip -in -selection clipboard"
+elif command -v xsel >/dev/null 2>&1; then
+  tmux bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "xsel --clipboard --input"
+elif command -v pbcopy >/dev/null 2>&1; then
+  tmux bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "pbcopy"
+fi
+
+# Mouse drag also copies to clipboard if available
+if command -v xclip >/dev/null 2>&1; then
+  tmux bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "xclip -in -selection clipboard"
+elif command -v xsel >/dev/null 2>&1; then
+  tmux bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "xsel --clipboard --input"
+elif command -v pbcopy >/dev/null 2>&1; then
+  tmux bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
+fi
+
+# Pane navigation shortcuts
 tmux bind-key -n F1 select-pane -t "${SESSION_NAME}:0.0"
 tmux bind-key -n F2 select-pane -t "${SESSION_NAME}:0.1"
 tmux bind-key -n F3 select-pane -t "$SCOREBOARD_PANE"
 tmux bind-key -n F5 respawn-pane -k -t "$SCOREBOARD_PANE" "SCOREBOARD_INTERVAL=${SCOREBOARD_INTERVAL} $SCOREBOARD_CMD"
-tmux display-message "[exam-env] TUI Keys: j/k navigate | f flag | / search | q quit | F1-F3 panes | F5 restart scoreboard"
+
+tmux display-message "[exam-env] Copy: Shift+Mouse or Ctrl+b [ then v/y | TUI: j/k/f/F// | Panes: F1-F3"
 
 exec tmux attach -t "$SESSION_NAME"
 

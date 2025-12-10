@@ -232,7 +232,7 @@ function createUI() {
     width: "100%",
     height: 2,
     content:
-      "{cyan-fg}[↑/↓/j/k]{/} Navigate | {cyan-fg}[Enter]{/} Select | {cyan-fg}[f]{/} Flag | {cyan-fg}[s]{/} Solution | {cyan-fg}[/]{/} Search | {cyan-fg}[q/Esc]{/} Quit",
+      "{cyan-fg}[↑/↓/j/k]{/} Navigate | {cyan-fg}[Enter]{/} Select | {cyan-fg}[f]{/} Flag | {cyan-fg}[F]{/} Filter | {cyan-fg}[s]{/} Solution | {cyan-fg}[/]{/} Search | {cyan-fg}[q/Esc]{/} Quit",
     tags: true,
     style: {
       border: { fg: "cyan" },
@@ -392,7 +392,8 @@ ${"─".repeat(60)}
 {white-fg}${body}{/}
 
 ${"─".repeat(60)}
-{gray-fg}Press 'f' to ${isFlagged ? "unflag" : "flag"} | Press 's' to view solution{/}
+{gray-fg}Press 'f' to ${isFlagged ? "unflag" : "flag"} | Press 's' for solution{/}
+{gray-fg}💡 Copy: {yellow-fg}Shift+Mouse{/} or {yellow-fg}Ctrl+b [{/} then {yellow-fg}v{/}(select) {yellow-fg}y{/}(copy){/}
 `;
 
     taskDetail.setContent(content);
@@ -760,11 +761,14 @@ the "latest" revision (which points to "default").
   // Update status bar
   function updateStatusBar() {
     const filtered = getFilteredTasks();
+    const currentTask = filtered[currentIndex];
+    const currentTaskDisplay = currentTask ? `Task ${String(currentTask.id).padStart(2, '0')}` : '--';
     const flagCount = flagged.size;
     const mode = filterMode === "all" ? "All" : "Flagged";
     const search = searchQuery ? ` | Search: "${searchQuery}"` : "";
+    const position = filtered.length > 0 ? `${currentIndex + 1}/${filtered.length}` : '0/0';
     statusBar.setContent(
-      `Mode: {cyan-fg}${mode}{/} | Tasks: {cyan-fg}${filtered.length}/${tasks.length}{/} | Flagged: {yellow-fg}${flagCount}{/}${search}`
+      `{cyan-fg}${currentTaskDisplay}{/} (${position}) | Mode: {cyan-fg}${mode}{/} | Total: {cyan-fg}${tasks.length}{/} | Flagged: {yellow-fg}${flagCount}{/}${search}`
     );
     screen.render();
   }
@@ -815,20 +819,14 @@ the "latest" revision (which points to "default").
     screen.render();
   });
 
-  screen.key(["a"], () => {
+  screen.key(["S-f"], () => {
     if (solutionsBox.hidden) {
-      filterMode = "all";
+      // Toggle between all and flagged modes
+      filterMode = filterMode === "all" ? "flagged" : "all";
       currentIndex = 0;
       updateTaskList();
       updateTaskDetail();
     }
-  });
-
-  screen.key(["S-f"], () => {
-    filterMode = "flagged";
-    currentIndex = 0;
-    updateTaskList();
-    updateTaskDetail();
   });
 
   screen.key(["/"], () => {
