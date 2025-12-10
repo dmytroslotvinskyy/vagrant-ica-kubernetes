@@ -3,6 +3,7 @@ require "yaml"
 vagrant_root = File.dirname(File.expand_path(__FILE__))
 settings = YAML.load_file "#{vagrant_root}/settings.yaml"
 MIN_MEMORY_MB = 2048
+EXAM_MODE = settings["exam_mode"] != false
 
 IP_SECTIONS = settings["network"]["control_ip"].match(/^([0-9.]+\.)([^.]+)$/)
 # First 3 octets including the trailing dot:
@@ -93,15 +94,13 @@ Vagrant.configure("2") do |config|
       path: "scripts/master.sh"
     # Note: exam-setup.sh removed; all workloads now deployed by istio-ica-lab.sh
     # after Istio is installed so pods get sidecars automatically.
-    controlplane.vm.provision "shell", run: "always", inline: <<-SHELL
-      echo "[exam-env] Preparing tmux helper session (requires tmux inside the VM)"
-      if command -v tmux >/dev/null 2>&1; then
-        sudo /vagrant/scripts/exam-env.sh >/var/log/exam-env.log 2>&1 || true
-        echo "[exam-env] Tmux helper ready. Attach with: tmux attach -t exam"
-      else
-        echo "[exam-env] tmux not installed; install with 'sudo apt install tmux' then run /vagrant/scripts/exam-env.sh"
-      fi
-    SHELL
+    if EXAM_MODE
+      controlplane.vm.provision "shell", run: "always", inline: <<-SHELL
+        echo "[exam-env] To start the exam UI, run:"
+        echo "  sudo /vagrant/scripts/exam-tui-bun.sh"
+        echo "(or use /vagrant/scripts/exam-env.sh for the legacy bash viewer)"
+      SHELL
+    end
     controlplane.vm.provision "shell",
       env: {
         "SSH_USER" => "student",
@@ -168,13 +167,13 @@ Vagrant.configure("2") do |config|
 
       # Run Istio + exam lab provisioning only after the last worker finishes so
       # Kubernetes is up and nodes are joined before installing the lab payload.
-      if i == NUM_WORKER_NODES
+      if i == NUM_WORKER_NODES && EXAM_MODE
         node.trigger.after :provision do |trigger|
           trigger.name = "istio-after-workers"
           trigger.info = "[istio-ica-lab] Installing Istio after workers are ready"
           trigger.run = {
             env: { "VAGRANT_CWD" => vagrant_root },
-            inline: "vagrant ssh controlplane -c 'sudo bash /vagrant/scripts/istio-ica-lab.sh'"
+            inline: "vagrant ssh controlplane -c 'sudo bash /vagrant/scripts/lab-up.sh'"
           }
         end
       end

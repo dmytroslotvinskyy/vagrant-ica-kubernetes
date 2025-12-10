@@ -568,5 +568,10 @@ restart_default_ns_workloads
 chmod_host_scripts
 verify_lab_health
 
-echo "[istio-ica-lab] Done. Log in with: vagrant ssh controlplane"
-echo "[istio-ica-lab] Then run: /vagrant/tasks.sh, /vagrant/check-exam.sh, or /vagrant/scripts/exam-env.sh"
+echo "[istio-ica-lab] Done. Recommended next steps:"
+echo "  vagrant ssh controlplane"
+echo "  sudo /vagrant/scripts/exam-tui-bun.sh"
+echo ""
+echo "[istio-ica-lab] Legacy helpers:"
+echo "  /vagrant/scripts/exam-env.sh       # bash viewer"
+echo "  /vagrant/scripts/verify-lab.sh     # one-shot sanity"
