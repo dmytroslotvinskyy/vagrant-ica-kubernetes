@@ -1,5 +1,10 @@
 # PowerShell script to launch the exam TUI after vagrant up
 # Usage: .\start-exam.ps1
+# 
+# If you get an execution policy error, run:
+#   powershell -ExecutionPolicy Bypass -File .\start-exam.ps1
+# Or set execution policy (requires admin):
+#   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "  Starting ICA Istio Lab Exam" -ForegroundColor Cyan

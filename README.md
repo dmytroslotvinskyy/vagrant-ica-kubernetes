@@ -74,10 +74,18 @@ Mock exam quick start:
    **Option A: Quick-start script (recommended)**
    ```bash
    ./start-exam.sh          # Linux/Mac/WSL
-   # OR
-   .\start-exam.ps1         # Windows PowerShell
+   ```
+   ```cmd
+   start-exam.cmd           # Windows (recommended - no policy issues)
+   ```
+   ```powershell
+   .\start-exam.ps1         # Windows PowerShell (may require policy change)
+   # OR if you get execution policy error:
+   .\start-exam-bypass.ps1  # Windows PowerShell (bypasses policy)
    ```
    This single command handles SSH and TUI launch automatically.
+   
+   **Note for Windows users:** If you get a PowerShell execution policy error, use `start-exam.cmd` instead (no policy required).
 
    **Option B: Manual steps**
    ```bash

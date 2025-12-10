@@ -65,7 +65,9 @@ Vagrant.configure("2") do |config|
         end
     end
     if AUTO_START_TARGETS.any?
-      [:up, :reload, :provision].each do |action|
+      # Only trigger on reload/provision, not :up, to avoid conflicts with "vagrant up" (no args)
+      # which brings up all VMs. The trigger is useful for "vagrant reload controlplane" scenarios.
+      [:reload, :provision].each do |action|
         controlplane.trigger.after action do |trigger|
           trigger.name = "auto-start-workers"
           trigger.info = "[controlplane] Auto-starting lab nodes after controlplane #{action}: #{AUTO_START_TARGETS.join(', ')}"
