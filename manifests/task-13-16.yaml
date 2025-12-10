@@ -1,4 +1,4 @@
-apiVersion: telemetry.istio.io/v1alpha1
+apiVersion: telemetry.istio.io/v1
 kind: Telemetry
 metadata:
   name: mesh-default
@@ -10,7 +10,7 @@ spec:
     - name: zipkin
     randomSamplingPercentage: 100
 ---
-apiVersion: security.istio.io/v1beta1
+apiVersion: security.istio.io/v1
 kind: PeerAuthentication
 metadata:
   name: default-strict
@@ -19,7 +19,7 @@ spec:
   mtls:
     mode: STRICT
 ---
-apiVersion: security.istio.io/v1beta1
+apiVersion: security.istio.io/v1
 kind: PeerAuthentication
 metadata:
   name: httpbin-port-permissive
@@ -29,10 +29,10 @@ spec:
     matchLabels:
       app: httpbin
   portLevelMtls:
-    "8080":
+    "8000":
       mode: PERMISSIVE
 ---
-apiVersion: security.istio.io/v1beta1
+apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
   name: allow-nothing
@@ -45,7 +45,7 @@ metadata:
   name: curl
   namespace: default
 ---
-apiVersion: security.istio.io/v1beta1
+apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
   name: curl-to-httpbin-post-only
@@ -54,6 +54,7 @@ spec:
   selector:
     matchLabels:
       app: httpbin
+  action: ALLOW
   rules:
   - from:
     - source:

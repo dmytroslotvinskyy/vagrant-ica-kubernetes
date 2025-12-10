@@ -39,6 +39,8 @@ Vagrant.configure("2") do |config|
     config.vm.box = settings["software"]["box"]
   end
   config.vm.box_check_update = true
+  # Allow slower hosts to finish booting before SSH times out.
+  config.vm.boot_timeout = 600
 
   config.vm.define "controlplane" do |controlplane|
     controlplane.vm.hostname = "controlplane"
@@ -62,9 +64,9 @@ Vagrant.configure("2") do |config|
     end
     if AUTO_START_TARGETS.any?
       [:up, :reload, :provision].each do |action|
-        controlplane.trigger.before action do |trigger|
+        controlplane.trigger.after action do |trigger|
           trigger.name = "auto-start-workers"
-          trigger.info = "[controlplane] Auto-starting lab nodes: #{AUTO_START_TARGETS.join(', ')}"
+          trigger.info = "[controlplane] Auto-starting lab nodes after controlplane #{action}: #{AUTO_START_TARGETS.join(', ')}"
           trigger.run = {
             env: { "VAGRANT_CWD" => vagrant_root },
             inline: "vagrant up #{AUTO_START_TARGETS.join(' ')}"
@@ -89,10 +91,8 @@ Vagrant.configure("2") do |config|
         "SERVICE_CIDR" => settings["network"]["service_cidr"]
       },
       path: "scripts/master.sh"
-    controlplane.vm.provision "shell", run: "always", path: "scripts/istio-ica-lab.sh"
-    if settings["exam_mode"]
-      controlplane.vm.provision "shell", run: "always", path: "scripts/exam-setup.sh"
-    end
+    # Note: exam-setup.sh removed; all workloads now deployed by istio-ica-lab.sh
+    # after Istio is installed so pods get sidecars automatically.
     controlplane.vm.provision "shell", run: "always", inline: <<-SHELL
       echo "[exam-env] Preparing tmux helper session (requires tmux inside the VM)"
       if command -v tmux >/dev/null 2>&1; then
@@ -164,6 +164,19 @@ Vagrant.configure("2") do |config|
       # Only install the dashboard after provisioning the last worker (and when enabled).
       if i == NUM_WORKER_NODES and settings["software"]["dashboard"] and settings["software"]["dashboard"] != ""
         node.vm.provision "shell", path: "scripts/dashboard.sh"
+      end
+
+      # Run Istio + exam lab provisioning only after the last worker finishes so
+      # Kubernetes is up and nodes are joined before installing the lab payload.
+      if i == NUM_WORKER_NODES
+        node.trigger.after :provision do |trigger|
+          trigger.name = "istio-after-workers"
+          trigger.info = "[istio-ica-lab] Installing Istio after workers are ready"
+          trigger.run = {
+            env: { "VAGRANT_CWD" => vagrant_root },
+            inline: "vagrant ssh controlplane -c 'sudo bash /vagrant/scripts/istio-ica-lab.sh'"
+          }
+        end
       end
     end
 

@@ -65,7 +65,8 @@ if [ -f /root/.bun/bin/bun ]; then
   /root/.bun/bin/bun --version | sed 's/^/  root:    /'
 fi
 if [ -f /home/vagrant/.bun/bin/bun ]; then
-  su - vagrant -c 'bun --version' | sed 's/^/  vagrant: /'
+  # Ensure PATH includes Bun for the vagrant user during verification to avoid false failures.
+  su - vagrant -c 'export PATH="$HOME/.bun/bin:$PATH"; bun --version' | sed 's/^/  vagrant: /' || true
 fi
 
 echo ""

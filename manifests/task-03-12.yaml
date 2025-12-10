@@ -1,11 +1,11 @@
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: istio
 spec:
   controllerName: istio.io/gateway-controller
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: Gateway
 metadata:
   name: httpbin-gw
@@ -21,7 +21,7 @@ spec:
     hosts:
     - httpbin.com
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: VirtualService
 metadata:
   name: httpbin-vs
@@ -38,7 +38,7 @@ spec:
         port:
           number: 8000
 ---
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: httpbin-kgw
@@ -54,7 +54,7 @@ spec:
       namespaces:
         from: Same
 ---
-apiVersion: gateway.networking.k8s.io/v1beta1
+apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: httpbin-route
@@ -69,7 +69,7 @@ spec:
     - name: httpbin
       port: 8000
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:
   name: payments-dr
@@ -84,7 +84,7 @@ spec:
     labels:
       version: v2
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: VirtualService
 metadata:
   name: payments-vs
@@ -108,7 +108,7 @@ spec:
       perTryTimeout: 1s
       retryOn: 5xx,connect-failure,refused-stream
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: VirtualService
 metadata:
   name: helloworld-match-vs
@@ -145,7 +145,7 @@ spec:
         host: helloworld.default.svc.cluster.local
         subset: v1
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:
   name: helloworld-cb
@@ -159,7 +159,7 @@ spec:
         http2MaxRequests: 1
         maxRequestsPerConnection: 1
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:
   name: fakeservice-od

@@ -305,7 +305,7 @@ task_14() {
   kubectl -n default get peerauthentication httpbin-port-permissive -o json | python3 -c "
 import json,sys
 doc=json.load(sys.stdin)
-port=doc.get('spec',{}).get('portLevelMtls',{}).get('8080',{}).get('mode')
+port=doc.get('spec',{}).get('portLevelMtls',{}).get('8000',{}).get('mode')
 sys.exit(0 if port=='PERMISSIVE' else 1)
 "
 }
@@ -332,21 +332,93 @@ task_16() {
   kubectl -n swagger get pods >/dev/null 2>&1
 }
 
+declare -A TASK_SOLUTIONS=(
+  [1]="istioctl install --set profile=demo -y"
+  [2]="kubectl label ns default istio-injection=enabled --overwrite && kubectl -n default rollout restart deploy"
+  [3]="kubectl apply -f /vagrant/manifests/task-03-12.yaml  # httpbin-gw + httpbin-vs"
+  [4]="kubectl apply -f /vagrant/manifests/task-03-12.yaml  # httpbin-kgw + httpbin-route (Gateway API)"
+  [5]="kubectl apply -f /vagrant/manifests/task-03-12.yaml  # payments-dr + payments-vs with 70/30 weights"
+  [6]="kubectl apply -f /vagrant/manifests/task-03-12.yaml  # helloworld-match-vs with /v1, /v2, fallback"
+  [7]="kubectl apply -f /vagrant/manifests/task-03-12.yaml  # payments-vs with timeout: 2s and retries"
+  [8]="kubectl apply -f /vagrant/manifests/task-03-12.yaml  # helloworld fault injection 2s delay 20%"
+  [9]="kubectl apply -f /vagrant/manifests/task-03-12.yaml  # helloworld-cb DestinationRule circuit breaker"
+  [10]="kubectl apply -f /vagrant/manifests/task-03-12.yaml  # fakeservice-od DestinationRule outlierDetection"
+  [11]="kubectl apply -f /vagrant/manifests/task-11-16.yaml  # prometheus deployment"
+  [12]="kubectl apply -f /vagrant/manifests/task-11-16.yaml  # kiali + kubectl label ns bookinfo istio-injection=enabled"
+  [13]="kubectl apply -f /vagrant/manifests/task-11-16.yaml && kubectl apply -f /vagrant/manifests/task-13-16.yaml  # jaeger + Telemetry 100%"
+  [14]="kubectl apply -f /vagrant/manifests/task-13-16.yaml  # PeerAuthentication default-strict + httpbin-port-permissive"
+  [15]="kubectl apply -f /vagrant/manifests/task-13-16.yaml  # AuthorizationPolicy curl POST only"
+  [16]="istioctl tag set latest --revision default --overwrite && kubectl label ns swagger istio.io/rev=latest --overwrite"
+)
+
+show_solutions() {
+  echo
+  echo "================ SOLUTIONS FOR FAILED TASKS ================"
+  local has_failed=false
+  for t in $(seq 1 "$TASK_COUNT"); do
+    local status="${TASK_STATUS[$t]:-SKIP}"
+    if [[ "$status" == "FAIL" ]]; then
+      has_failed=true
+      local label="${TASK_LABELS[$t]:-Task ${t}}"
+      local solution="${TASK_SOLUTIONS[$t]:-No solution available}"
+      echo
+      echo -e "${RED}Task ${t}${NC}: ${label}"
+      echo "  Solution: ${solution}"
+    fi
+  done
+  if [ "$has_failed" = false ]; then
+    echo "  No failed tasks - all checks passed!"
+  fi
+  echo
+  echo "Full manifest files are in /vagrant/manifests/"
+  echo "============================================================="
+}
+
+usage() {
+  echo "Usage: $0 [options] [task-ids...]"
+  echo
+  echo "Options:"
+  echo "  -s, --solutions    Show solutions for failed tasks after checking"
+  echo "  -h, --help         Show this help message"
+  echo
+  echo "Examples:"
+  echo "  $0                 Check all tasks"
+  echo "  $0 all             Check all tasks"
+  echo "  $0 1 2 3           Check specific tasks"
+  echo "  $0 -s              Check all tasks and show solutions for failures"
+  echo "  $0 -s 5 6 7        Check specific tasks and show solutions for failures"
+}
+
 main() {
   local tasks=()
-  if [ "$#" -eq 0 ]; then
+  local show_solutions_flag=false
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -s|--solutions)
+        show_solutions_flag=true
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        if [[ "$1" =~ ^([Aa][Ll][Ll])$ ]]; then
+          for t in $(seq 1 "$TASK_COUNT"); do
+            tasks+=("$t")
+          done
+        else
+          tasks+=("$1")
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  if [ "${#tasks[@]}" -eq 0 ]; then
     for t in $(seq 1 "$TASK_COUNT"); do
       tasks+=("$t")
-    done
-  else
-    for arg in "$@"; do
-      if [[ "$arg" =~ ^([Aa][Ll][Ll])$ ]]; then
-        for t in $(seq 1 "$TASK_COUNT"); do
-          tasks+=("$t")
-        done
-      else
-        tasks+=("$arg")
-      fi
     done
   fi
 
@@ -361,6 +433,14 @@ main() {
   else
     echo "=== RESULT: BELOW PASS THRESHOLD ==="
   fi
+
+  if [ "$show_solutions_flag" = true ]; then
+    show_solutions
+  else
+    echo
+    echo "Tip: Run with -s or --solutions to see solutions for failed tasks"
+  fi
+
   exit 0
 }
 
