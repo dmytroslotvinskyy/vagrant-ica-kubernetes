@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import blessed from "blessed";
+import type { Widgets } from "blessed";
 import { readFile } from "fs/promises";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -36,10 +37,36 @@ interface Task {
 }
 
 let tasks: Task[] = [];
-let flagged = new Set<number>();
+let flagged: Set<number> = new Set<number>();
 let currentIndex = 0;
 let filterMode: "all" | "flagged" = "all";
 let searchQuery = "";
+
+// --- Exam timer config ---
+const EXAM_DURATION_MIN = Number.isFinite(parseInt(process.env.EXAM_DURATION_MIN ?? "120", 10))
+  ? parseInt(process.env.EXAM_DURATION_MIN ?? "120", 10)
+  : 120;
+const EXAM_DURATION_SEC = EXAM_DURATION_MIN * 60;
+const examStartTime = Date.now();
+
+function getRemainingSeconds(): number {
+  const elapsedSec = Math.floor((Date.now() - examStartTime) / 1000);
+  return Math.max(0, EXAM_DURATION_SEC - elapsedSec);
+}
+
+function formatRemainingTime(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+
+  if (h > 0) {
+    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s
+      .toString()
+      .padStart(2, "0")}`;
+  }
+
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
 
 // Solutions map for all tasks (hoisted to module scope for reusability)
 const TASK_SOLUTIONS: Record<number, string> = {
@@ -447,7 +474,12 @@ function getFilteredTasks(): Task[] {
 }
 
 // Create the TUI
-function createUI() {
+function createUI(): {
+  screen: Widgets.Screen;
+  updateTaskList: () => void;
+  updateTaskDetail: () => void;
+  updateStatusBar: () => void;
+} {
   const screen = blessed.screen({
     smartCSR: true,
     title: "ICA Istio Lab - Task Navigator",
@@ -481,8 +513,8 @@ function createUI() {
     keys: true,
     mouse: true,
     style: {
-      selected: { bg: "blue", fg: "white", bold: true },
-      item: { fg: "white" },
+      selected: { bg: "black", fg: "cyan", bold: true },
+      item: { fg: "cyan" },
       border: { fg: "cyan" },
     },
     border: { type: "line" },
@@ -526,7 +558,7 @@ function createUI() {
     height: 1,
     content: "",
     tags: true,
-    style: { fg: "yellow" },
+    style: { fg: "cyan" },
   });
 
   // Solutions box (hidden by default)
@@ -545,10 +577,10 @@ function createUI() {
     mouse: true,
     scrollbar: {
       ch: "█",
-      style: { fg: "yellow" },
+      style: { fg: "cyan" },
     },
     style: {
-      border: { fg: "yellow" },
+      border: { fg: "cyan" },
     },
     border: { type: "line" },
     hidden: true,
@@ -580,8 +612,8 @@ function createUI() {
     label: " Search ",
     border: { type: "line" },
     style: {
-      border: { fg: "yellow" },
-      focus: { border: { fg: "green" } },
+      border: { fg: "cyan" },
+      focus: { border: { fg: "cyan" } },
     },
     hidden: true,
     inputOnFocus: true,
@@ -593,9 +625,9 @@ function createUI() {
     taskList.clearItems();
     
     filtered.forEach((task, idx) => {
-      const flag = flagged.has(task.id) ? "{yellow-fg}★{/}" : " ";
+      const flag = flagged.has(task.id) ? "{cyan-fg}★{/}" : " ";
       const pts = task.points ?? "?";
-      const label = `${flag} {bold}${task.title}{/bold} (${pts}pts)\n   ${task.subtitle}`;
+      const label = `${flag} {cyan-fg}{bold}${task.title}{/bold}{/} (${pts}pts)\n   ${task.subtitle}`;
       taskList.addItem(label);
     });
 
@@ -615,56 +647,31 @@ function createUI() {
   // Highlight important terms in task content
   function highlightContent(text: string): string {
     // First, highlight backtick-wrapped terms with different colors based on type
-    text = text.replace(/`([^`]+)`/g, (match, name) => {
-      // Namespaces (magenta/bold)
-      if (name.match(/^(default|istio-system|bookinfo|payments|tonga|swagger|hello)$/i)) {
-        return `{magenta-fg}{bold}\`${name}\`{/bold}{/}`;
-      }
-      // Kubernetes resource types (cyan/bold)
-      if (name.match(/^(ServiceEntry|VirtualService|DestinationRule|Gateway|PeerAuthentication|AuthorizationPolicy|HTTPRoute|GatewayClass|Telemetry|Deployment|Service|Pod|Namespace)$/i)) {
-        return `{cyan-fg}{bold}\`${name}\`{/bold}{/}`;
-      }
-      // Resource names with dashes (green)
-      if (name.match(/[-_]/) || name.match(/^(httpbin|helloworld|payments|curl|istiod|istio-ingressgateway|prometheus|kiali|jaeger|app-local-se|app-local-vs|httpbin-gw|httpbin-vs|httpbin-kgw|httpbin-route|payments-dr|payments-vs|helloworld-match-vs|helloworld-cb|fakeservice-od|default-strict|httpbin-port-permissive|curl-to-httpbin-post-only|allow-nothing|mesh-default)$/i)) {
-        return `{green-fg}\`${name}\`{/}`;
-      }
-      // Port numbers in backticks
-      if (name.match(/^\d+$/)) {
-        return `{bright-yellow-fg}\`${name}\`{/}`;
-      }
-      // Default highlight for other backtick-wrapped terms (yellow)
-      return `{yellow-fg}\`${name}\`{/}`;
-    });
+    text = text.replace(/`([^`]+)`/g, (_match, name) => `{cyan-fg}\`${name}\`{/}`);
 
     // Highlight standalone namespace mentions
-    text = text.replace(/\b(namespace|Namespace)\s+`?([a-z0-9-]+)`?/gi, (match, keyword, ns) => {
-      return `{white-fg}${keyword}{/} {magenta-fg}{bold}${ns || ''}{/bold}{/}`;
+    text = text.replace(/\b(namespace|Namespace)\s+`?([a-z0-9-]+)`?/gi, (_match, keyword, ns) => {
+      return `{cyan-fg}${keyword} ${ns || ''}{/}`;
     });
 
     // Highlight commands (kubectl, istioctl, curl) - full line
-    text = text.replace(/^(kubectl|istioctl|curl)\s+([^\n]+)/gm, (match, cmd, args) => {
-      return `{bright-blue-fg}{bold}${cmd}{/bold}{/} {white-fg}${args}{/}`;
+    text = text.replace(/^(kubectl|istioctl|curl)\s+([^\n]+)/gm, (_match, cmd, args) => {
+      return `{cyan-fg}{bold}${cmd}{/bold} ${args}{/}`;
     });
 
-    // Highlight "Test the endpoint" or similar instruction lines
+    // Instruction lines
     text = text.replace(/^(Test|You can|Confirm|Verify|Run|Create|Apply|Update|Ensure|Deploy|Install|Label|Expose|Add|Inject|Configure)\b/gmi, (match) => {
-      return `{bright-cyan-fg}${match}{/}`;
+      return `{cyan-fg}${match}{/}`;
     });
 
-    // Highlight port numbers in context
-    text = text.replace(/\b(port|Port|on port)\s+(\d+)/gi, (match, keyword, port) => {
-      return `{white-fg}${keyword}{/} {bright-yellow-fg}${port}{/}`;
+    // Ports, percentages, durations, hostnames all in cyan
+    text = text.replace(/\b(port|Port|on port)\s+(\d+)/gi, (_m, keyword, port) => {
+      return `{cyan-fg}${keyword} ${port}{/}`;
     });
-
-    // Highlight percentages
-    text = text.replace(/\b(\d+)%/g, `{bright-yellow-fg}$1%{/}`);
-    
-    // Highlight time durations
-    text = text.replace(/\b(\d+[sm])\b/g, `{bright-yellow-fg}$1{/}`);
-
-    // Highlight hostnames/domains
+    text = text.replace(/\b(\d+)%/g, `{cyan-fg}$1%{/}`);
+    text = text.replace(/\b(\d+[sm])\b/g, `{cyan-fg}$1{/}`);
     text = text.replace(/\b([a-z0-9-]+\.(com|local|svc\.cluster\.local))\b/gi, (match) => {
-      return `{bright-green-fg}${match}{/}`;
+      return `{cyan-fg}${match}{/}`;
     });
 
     return text;
@@ -687,7 +694,7 @@ function createUI() {
     }
 
     const isFlagged = flagged.has(task.id);
-    const flagStatus = isFlagged ? " {yellow-fg}★ FLAGGED{/}" : "";
+    const flagStatus = isFlagged ? " {cyan-fg}★ FLAGGED{/}" : "";
     const taskNumber = String(task.id).padStart(2, '0');
     
     // Format the task body with enhanced highlighting
@@ -702,7 +709,7 @@ function createUI() {
         if (para.match(/^[-*]\s+/m)) {
           return para
             .split("\n")
-            .map((line) => line.replace(/^[-*]\s+/, `  {yellow-fg}•{/} `))
+            .map((line) => line.replace(/^[-*]\s+/, `  {cyan-fg}•{/} `))
             .join("\n");
         }
         return para;
@@ -714,16 +721,16 @@ function createUI() {
 
     // Format content with task number at top
     const content = `
-{white-fg}{bold}Task ${taskNumber} ({bright-cyan-fg}${task.points ?? "?"} pts{/}){/bold}{/}${flagStatus}
+{cyan-fg}{bold}Task ${taskNumber} (${task.points ?? "?"} pts){/bold}{/}${flagStatus}
 {cyan-fg}{bold}${task.subtitle}{/bold}{/}
 
 ${"─".repeat(60)}
 
-{white-fg}${body}{/}
+{cyan-fg}${body}{/}
 
 ${"─".repeat(60)}
-{gray-fg}Press 'f' to ${isFlagged ? "unflag" : "flag"} | Press 's' for solution{/}
-{gray-fg}💡 Copy: {yellow-fg}Shift+Mouse{/} or {yellow-fg}Ctrl+b [{/} then {yellow-fg}v{/}(select) {yellow-fg}y{/}(copy){/}
+{cyan-fg}Press 'f' to ${isFlagged ? "unflag" : "flag"} | Press 's' for solution{/}
+{cyan-fg}💡 Copy: Shift+Mouse or Ctrl+b [ then v(select) y(copy){/}
 `;
 
     taskDetail.setContent(content);
@@ -738,20 +745,22 @@ ${"─".repeat(60)}
     if (!task) return;
 
     const taskId = typeof task.id === 'string' ? parseInt(task.id) : task.id;
-    const solution = TASK_SOLUTIONS[taskId] || "No solution available for this task.";
+    const solutionRaw = TASK_SOLUTIONS[taskId] || "No solution available for this task.";
+    // Strip existing color tags to keep a monochrome azure look
+    const solution = solutionRaw.replace(/\{[^}]+\}/g, "");
     
     solutionsBox.setContent(
       `${solution}\n\n` +
-      `{gray-fg}─${"─".repeat(58)}─{/}\n\n` +
-      `{yellow-fg}How to copy commands:{/}\n` +
-      `{white-fg}1. Use tmux copy mode: Ctrl+b then [\n` +
+      `{cyan-fg}─${"─".repeat(58)}─{/}\n\n` +
+      `{cyan-fg}How to copy commands:{/}\n` +
+      `{cyan-fg}1. Use tmux copy mode: Ctrl+b then [\n` +
       `2. Navigate with arrow keys\n` +
       `3. Press Space to start selection\n` +
       `4. Move to end and press Enter to copy\n` +
       `5. Paste with Ctrl+b then ]{/}\n\n` +
-      `{yellow-fg}Or view in file:{/}\n` +
-      `{white-fg}cat /vagrant/TASK-SOLUTIONS.txt{/}\n\n` +
-      `{gray-fg}Press 'Esc' or 'q' to close | Use arrow keys to scroll{/}`
+      `{cyan-fg}Or view in file:{/}\n` +
+      `{cyan-fg}cat /vagrant/TASK-SOLUTIONS.txt{/}\n\n` +
+      `{cyan-fg}Press 'Esc' or 'q' to close | Use arrow keys to scroll{/}`
     );
     solutionsBox.setScrollPerc(0);
     solutionsBox.show();
@@ -768,8 +777,11 @@ ${"─".repeat(60)}
     const mode = filterMode === "all" ? "All" : "Flagged";
     const search = searchQuery ? ` | Search: "${searchQuery}"` : "";
     const position = filtered.length > 0 ? `${currentIndex + 1}/${filtered.length}` : '0/0';
+    const remainingSec = getRemainingSeconds();
+    const timeStr = formatRemainingTime(remainingSec);
+    const timeLabel = remainingSec === 0 ? "{cyan-fg}TIME UP{/}" : `{cyan-fg}${timeStr}{/}`;
     statusBar.setContent(
-      `{cyan-fg}${currentTaskDisplay}{/} (${position}) | Mode: {cyan-fg}${mode}{/} | Total: {cyan-fg}${tasks.length}{/} | Flagged: {yellow-fg}${flagCount}{/}${search}`
+      `{cyan-fg}${currentTaskDisplay}{/} (${position}) | Mode: {cyan-fg}${mode}{/} | Total: {cyan-fg}${tasks.length}{/} | Flagged: {cyan-fg}${flagCount}{/}${search} | Time left: ${timeLabel}`
     );
     screen.render();
   }
@@ -883,17 +895,22 @@ ${"─".repeat(60)}
   });
 
   taskList.focus();
-  return { screen, updateTaskList, updateTaskDetail };
+  return { screen, updateTaskList, updateTaskDetail, updateStatusBar };
 }
 
 // Main entry point
-async function main() {
+async function main(): Promise<void> {
   await loadTasks();
   await loadFlags();
   
-  const { updateTaskList, updateTaskDetail } = createUI();
+  const { updateTaskList, updateTaskDetail, updateStatusBar } = createUI();
   updateTaskList();
   updateTaskDetail();
+
+  // Kick off the countdown ticker
+  setInterval(() => {
+    updateStatusBar();
+  }, 1000);
 }
 
 main().catch((error) => {

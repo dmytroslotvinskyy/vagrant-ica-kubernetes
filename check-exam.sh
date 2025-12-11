@@ -1,7 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export KUBECONFIG="${KUBECONFIG:-/etc/kubernetes/admin.conf}"
+# Auto-detect kubeconfig to keep behavior consistent with verify-lab.sh / exam-scoreboard.sh
+auto_kubeconfig() {
+  if [ -n "${KUBECONFIG:-}" ] && [ -f "$KUBECONFIG" ]; then
+    echo "$KUBECONFIG"
+    return
+  fi
+  if [ -f "$(pwd)/configs/config" ]; then
+    echo "$(pwd)/configs/config"
+    return
+  fi
+  if [ -f "/vagrant/configs/config" ]; then
+    echo "/vagrant/configs/config"
+    return
+  fi
+  if [ -f "/etc/kubernetes/admin.conf" ]; then
+    echo "/etc/kubernetes/admin.conf"
+    return
+  fi
+  echo ""  # not found
+}
+
+KUBECONFIG_PATH="$(auto_kubeconfig)"
+if [ -z "$KUBECONFIG_PATH" ]; then
+  echo "[check-exam] WARNING: No kubeconfig found. Set KUBECONFIG or place configs/config in repo root." >&2
+else
+  export KUBECONFIG="$KUBECONFIG_PATH"
+fi
 
 declare -A TASK_POINTS=(
   [1]=7
