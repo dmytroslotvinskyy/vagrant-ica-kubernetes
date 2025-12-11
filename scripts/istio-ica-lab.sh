@@ -103,7 +103,12 @@ install_istio_control_plane() {
     # Verify it's actually healthy, not just partially installed
     if kubectl get deploy -n istio-system istiod >/dev/null 2>&1 && \
        kubectl get deploy -n istio-system istio-ingressgateway >/dev/null 2>&1; then
-      local istiod_ready=$(kubectl get deploy -n istio-system istiod -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
+      local istiod_ready
+      istiod_ready=$(kubectl get deploy -n istio-system istiod -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
+      # normalize empty/non-numeric to 0 to avoid integer errors
+      if ! [[ "$istiod_ready" =~ ^[0-9]+$ ]]; then
+        istiod_ready=0
+      fi
       if [ "$istiod_ready" -ge 1 ]; then
         echo "[istio-ica-lab] Istio control plane already healthy. Skipping install."
         return 0
