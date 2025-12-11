@@ -398,6 +398,25 @@ the "latest" revision (which points to "default").
   • istio.io/rev label: Tells which revision to use for injection`
 };
 
+// Manifests used per task (for inline viewing/copy)
+const TASK_MANIFEST_PATHS: Record<number, string[]> = {
+  3: ["/vagrant/manifests/task-03-12.yaml"],
+  4: ["/vagrant/manifests/task-03-12.yaml"],
+  5: ["/vagrant/manifests/task-03-12.yaml"],
+  6: ["/vagrant/manifests/task-03-12.yaml"],
+  7: ["/vagrant/manifests/task-03-12.yaml"],
+  8: ["/vagrant/manifests/task-03-12.yaml"],
+  9: ["/vagrant/manifests/task-03-12.yaml"],
+  10: ["/vagrant/manifests/task-03-12.yaml"],
+  11: ["/vagrant/manifests/task-11-16.yaml"],
+  12: ["/vagrant/manifests/task-11-16.yaml"],
+  13: ["/vagrant/manifests/task-11-16.yaml", "/vagrant/manifests/task-13-16.yaml"],
+  14: ["/vagrant/manifests/task-13-16.yaml"],
+  15: ["/vagrant/manifests/task-13-16.yaml"],
+};
+
+let lastSolutionText = "";
+
 // Parse tasks from markdown file
 function parseTasks(raw: string): Task[] {
   return raw
@@ -594,7 +613,7 @@ function createUI(): {
     width: "100%",
     height: 2,
     content:
-      "{cyan-fg}[↑/↓/j/k]{/} Navigate | {cyan-fg}[Enter]{/} Select | {cyan-fg}[f]{/} Flag | {cyan-fg}[F]{/} Filter | {cyan-fg}[s]{/} Solution | {cyan-fg}[/]{/} Search | {cyan-fg}[q/Esc]{/} Quit",
+      "{cyan-fg}[↑/↓/j/k]{/} Navigate | {cyan-fg}[Enter]{/} Select | {cyan-fg}[f]{/} Flag | {cyan-fg}[F]{/} Filter | {cyan-fg}[s]{/} Solution | {cyan-fg}[c]{/} Copy soln | {cyan-fg}[/]{/} Search | {cyan-fg}[q/Esc]{/} Quit",
     tags: true,
     style: {
       border: { fg: "cyan" },
@@ -739,7 +758,7 @@ ${"─".repeat(60)}
   }
 
   // Show solution for current task
-  function showSolution() {
+  async function showSolution() {
     const filtered = getFilteredTasks();
     const task = filtered[currentIndex];
     if (!task) return;
@@ -748,9 +767,27 @@ ${"─".repeat(60)}
     const solutionRaw = TASK_SOLUTIONS[taskId] || "No solution available for this task.";
     // Strip existing color tags to keep a monochrome azure look
     const solution = solutionRaw.replace(/\{[^}]+\}/g, "");
+    const manifestPaths = TASK_MANIFEST_PATHS[taskId] || [];
+
+    let manifestSection = "";
+    if (manifestPaths.length > 0) {
+      const parts: string[] = [];
+      for (const p of manifestPaths) {
+        try {
+          const data = await readFile(p, "utf8");
+          parts.push(`--- ${p} ---\n${data.trim()}`);
+        } catch (err) {
+          parts.push(`--- ${p} ---\n(could not load: ${err})`);
+        }
+      }
+      manifestSection = `\n{cyan-fg}Manifests:{/}\n${parts.join("\n\n")}\n`;
+    }
+
+    const copyHintPath = "/tmp/current-solution.txt";
+    lastSolutionText = `${solution}\n\n${manifestSection.replace(/\{[^}]+\}/g, "")}`.trim();
     
     solutionsBox.setContent(
-      `${solution}\n\n` +
+      `${solution}\n\n${manifestSection}` +
       `{cyan-fg}─${"─".repeat(58)}─{/}\n\n` +
       `{cyan-fg}How to copy commands:{/}\n` +
       `{cyan-fg}1. Use tmux copy mode: Ctrl+b then [\n` +
@@ -759,13 +796,35 @@ ${"─".repeat(60)}
       `4. Move to end and press Enter to copy\n` +
       `5. Paste with Ctrl+b then ]{/}\n\n` +
       `{cyan-fg}Or view in file:{/}\n` +
-      `{cyan-fg}cat /vagrant/TASK-SOLUTIONS.txt{/}\n\n` +
+      `{cyan-fg}cat /vagrant/TASK-SOLUTIONS.txt{/}\n` +
+      `{cyan-fg}Write this solution to file: press 'c' (saves to ${copyHintPath}){/}\n\n` +
       `{cyan-fg}Press 'Esc' or 'q' to close | Use arrow keys to scroll{/}`
     );
     solutionsBox.setScrollPerc(0);
     solutionsBox.show();
     solutionsBox.focus();
     screen.render();
+  }
+
+  async function copySolutionToFile() {
+    const outPath = "/tmp/current-solution.txt";
+    if (!lastSolutionText) {
+      return;
+    }
+    try {
+      await Bun.write(outPath, lastSolutionText);
+      solutionsBox.setContent(
+        `{cyan-fg}Saved current solution to ${outPath}{/}\n\n` +
+        `{cyan-fg}Inside tmux you can copy with:{/}\n` +
+        `{cyan-fg}cat ${outPath} | tmux load-buffer - && tmux paste-buffer{/}\n\n` +
+        `{cyan-fg}Press 'Esc' or 'q' to close{/}`
+      );
+      solutionsBox.setScrollPerc(0);
+      solutionsBox.show();
+    } catch (err) {
+      solutionsBox.setContent(`{cyan-fg}Failed to save solution: ${err}{/}`);
+      screen.render();
+    }
   }
 
   // Update status bar
@@ -822,7 +881,13 @@ ${"─".repeat(60)}
 
   screen.key(["s"], () => {
     if (solutionsBox.hidden) {
-      showSolution();
+      void showSolution();
+    }
+  });
+
+  screen.key(["c"], () => {
+    if (!solutionsBox.hidden) {
+      void copySolutionToFile();
     }
   });
 
