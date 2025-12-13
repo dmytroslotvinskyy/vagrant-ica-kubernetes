@@ -28,6 +28,32 @@ const DEFAULT_TASK_FILE = POSSIBLE_TASK_FILES.find(path => {
 const TASK_FILE = process.env.TASK_FILE ? resolve(process.env.TASK_FILE) : DEFAULT_TASK_FILE;
 const FLAG_FILE = process.env.FLAG_FILE || resolve(process.env.HOME || "~", ".ica-task-flags");
 
+// #region agent log
+const DEBUG_ENDPOINT = "http://127.0.0.1:7242/ingest/8ddb3bec-8d55-457a-b114-825467ed44f2";
+const DEBUG_SESSION = "debug-session";
+const DEBUG_RUN_ID = "initial";
+function agentLog(
+  hypothesisId: string,
+  message: string,
+  data: Record<string, unknown>,
+  location: string
+): void {
+  fetch(DEBUG_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sessionId: DEBUG_SESSION,
+      runId: DEBUG_RUN_ID,
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+}
+// #endregion
+
 interface Task {
   id: number;
   title: string;
@@ -441,7 +467,13 @@ async function loadTasks(): Promise<void> {
   try {
     const raw = await readFile(TASK_FILE, "utf8");
     tasks = parseTasks(raw);
+    // #region agent log
+    agentLog("H1", "loadTasks success", { taskFile: TASK_FILE, taskCount: tasks.length }, "tui.ts:loadTasks");
+    // #endregion
   } catch (error) {
+    // #region agent log
+    agentLog("H1", "loadTasks failure", { taskFile: TASK_FILE, error: String(error) }, "tui.ts:loadTasks");
+    // #endregion
     tasks = [
       {
         id: 1,
@@ -463,8 +495,14 @@ async function loadFlags(): Promise<void> {
       .filter((line) => /^\d+$/.test(line))
       .map(Number);
     flagged = new Set(ids);
+    // #region agent log
+    agentLog("H2", "loadFlags success", { flagFile: FLAG_FILE, count: flagged.size }, "tui.ts:loadFlags");
+    // #endregion
   } catch {
     flagged = new Set();
+    // #region agent log
+    agentLog("H2", "loadFlags failure", { flagFile: FLAG_FILE }, "tui.ts:loadFlags");
+    // #endregion
   }
 }
 
@@ -768,6 +806,9 @@ ${"─".repeat(60)}
     // Strip existing color tags to keep a monochrome azure look
     const solution = solutionRaw.replace(/\{[^}]+\}/g, "");
     const manifestPaths = TASK_MANIFEST_PATHS[taskId] || [];
+    // #region agent log
+    agentLog("H3", "showSolution paths", { taskId, pathCount: manifestPaths.length, paths: manifestPaths }, "tui.ts:showSolution");
+    // #endregion
 
     let manifestSection = "";
     if (manifestPaths.length > 0) {
@@ -778,6 +819,9 @@ ${"─".repeat(60)}
           parts.push(`--- ${p} ---\n${data.trim()}`);
         } catch (err) {
           parts.push(`--- ${p} ---\n(could not load: ${err})`);
+          // #region agent log
+          agentLog("H3", "manifest read failure", { taskId, path: p, error: String(err) }, "tui.ts:showSolution");
+          // #endregion
         }
       }
       manifestSection = `\n{cyan-fg}Manifests:{/}\n${parts.join("\n\n")}\n`;
@@ -858,6 +902,9 @@ ${"─".repeat(60)}
     }
     
     saveFlags().then(() => {
+      // #region agent log
+      agentLog("H2", "toggleFlag persisted", { taskId: task.id, flagCount: flagged.size }, "tui.ts:toggleFlag");
+      // #endregion
       updateTaskList();
       updateTaskDetail();
     });
@@ -967,6 +1014,10 @@ ${"─".repeat(60)}
 async function main(): Promise<void> {
   await loadTasks();
   await loadFlags();
+  
+  // #region agent log
+  agentLog("H1", "main init", { taskFile: TASK_FILE, flagFile: FLAG_FILE, tasks: tasks.length, flagged: flagged.size }, "tui.ts:main");
+  // #endregion
   
   const { updateTaskList, updateTaskDetail, updateStatusBar } = createUI();
   updateTaskList();
